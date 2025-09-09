@@ -19,15 +19,12 @@ import {
   SheetTrigger,
 } from "../ui/sheet";
 
-
 type NavItem = {
   label: string;
   href: string;
 };
 
-const NAV_ITEMS: NavItem[] = [
-  { label: "Home", href: "/" },
-];
+const NAV_ITEMS: NavItem[] = [{ label: "Home", href: "/" }];
 
 function DesktopLinks({ pathname }: { pathname: string }) {
   return (
@@ -52,18 +49,17 @@ function DesktopLinks({ pathname }: { pathname: string }) {
   );
 }
 
-function MobileMenu() {
+function MobileMenu({ branchName }: { branchName: string | null }) {
   return (
     <Sheet>
       <SheetTrigger asChild>
-        {/* <SupplierDialog/> */}
         <Button variant="outline" size="sm" className="md:hidden">
           Menu
         </Button>
       </SheetTrigger>
       <SheetContent side="left" className="w-64">
         <SheetHeader>
-          <SheetTitle>Navigation</SheetTitle>
+          <SheetTitle>{branchName ? branchName : "Navigation"}</SheetTitle>
         </SheetHeader>
         <div className="mt-4 flex flex-col gap-3">
           {NAV_ITEMS.map((item) => (
@@ -84,29 +80,43 @@ function MobileMenu() {
           </Link>
         </div>
       </SheetContent>
-
     </Sheet>
   );
 }
 
 export default function Navbar() {
   const pathname = usePathname();
+  const [branchName, setBranchName] = React.useState<string | null>(null);
+
+  React.useEffect(() => {
+    const raw = localStorage.getItem("branchDetails");
+    if (!raw) return;
+    try {
+      const parsed = JSON.parse(raw);
+      const branchFromStorage =
+        typeof parsed?.branchName === "string" ? parsed.branchName : null;
+      if (branchFromStorage) setBranchName(branchFromStorage);
+    } catch (err) {
+      console.error("Failed to parse branchDetails:", err);
+    }
+  }, []);
 
   return (
     <header className="w-full border-b border-neutral-200 dark:border-neutral-800 bg-white/70 dark:bg-neutral-950/70 backdrop-blur supports-[backdrop-filter]:bg-white/60 supports-[backdrop-filter]:dark:bg-neutral-950/60">
-      <div className="mx-auto max-w-full px-4 h-14 flex justify-between">
-        <div className="flex justify-between gap-3">
-          <Link href="/admin/dashboard" className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
-              <span className="text-white font-bold text-lg">V</span>
-            </div>
-            <span className="font-semibold">Voucher Admin</span>
-          </Link>
-        </div>
-          <DesktopLinks pathname={pathname} />
-
+      <div className="mx-auto max-w-full px-4 h-14 flex justify-between items-center">
+        {/* Left side with branch name */}
         <div className="flex items-center gap-3">
-          <MobileMenu />
+          <span className="font-semibold text-blue-600 uppercase">
+            {branchName ? branchName : "Branch"}
+          </span>
+        </div>
+
+        {/* Middle nav links */}
+        <DesktopLinks pathname={pathname} />
+
+        {/* Right side */}
+        <div className="flex items-center gap-3">
+          <MobileMenu branchName={branchName} />
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -118,19 +128,18 @@ export default function Navbar() {
                   height={32}
                   alt="Profile"
                 />
+                {/* <span className="hidden md:inline font-medium text-sm text-neutral-700 dark:text-neutral-200">
+                  {branchName}
+                </span> */}
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-56">
-              <DropdownMenuLabel>My Account</DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem asChild>
-                <Link href="/admin/profile">Profile</Link>
+              <DropdownMenuLabel>
+                {branchName ? branchName : "My Account"}
+              </DropdownMenuLabel>
+              <DropdownMenuItem>
+                <Link href="/login">Logout</Link>
               </DropdownMenuItem>
-              <DropdownMenuItem asChild>
-                <Link href="/admin/dashboard">Dashboard</Link>
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem>Logout</DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         </div>

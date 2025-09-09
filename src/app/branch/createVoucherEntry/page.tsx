@@ -313,13 +313,13 @@ export default function CreateVoucherPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-100 py-10">
-      <div className="max-w-6xl mx-auto bg-white rounded-lg shadow-md p-8">
-        <h2 className="text-2xl font-semibold text-gray-800 mb-8">
+    <div className="min-h-screen bg-transparent py-12 px-6">
+      <div className="max-w-7xl mx-auto">
+        <h2 className="text-3xl font-semibold text-gray-900 mb-8">
           Create New Voucher
         </h2>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-10 gap-y-8">
           {/* Voucher Book Range */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -330,7 +330,7 @@ export default function CreateVoucherPage() {
               onChange={async (e) =>
                 await handleInputChange("voucherBookRange", e.target.value)
               }
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
             >
               <option value="">Select a Voucher Book</option>
               {voucherBookOptions.map((book) => (
@@ -356,7 +356,7 @@ export default function CreateVoucherPage() {
                 );
               }}
               disabled={!formData.voucherBookRange}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
+              className="w-full px-3 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
             >
               <option value={nextNumber ?? ""}>
                 {nextNumber !== null
@@ -397,7 +397,7 @@ export default function CreateVoucherPage() {
               onChange={async (e) =>
                 await handleInputChange("invoiceNo", e.target.value)
               }
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
               placeholder="Enter invoice number"
             />
           </div>
@@ -413,7 +413,7 @@ export default function CreateVoucherPage() {
               onChange={async (e) =>
                 await handleInputChange("date", e.target.value)
               }
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
             />
           </div>
 
@@ -422,13 +422,13 @@ export default function CreateVoucherPage() {
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Supplier
             </label>
-            <div className="flex gap-2">
+            <div className="flex gap-3">
               <select
                 value={formData.supplier}
                 onChange={async (e) =>
                   await handleInputChange("supplier", e.target.value)
                 }
-                className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
+                className="flex-1 px-3 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
               >
                 <option value="">Select a Supplier</option>
                 {supplierOptions?.map((supplier) => (
@@ -440,7 +440,7 @@ export default function CreateVoucherPage() {
               <button
                 type="button"
                 onClick={() => setShowAddSupplier(!showAddSupplier)}
-                className="px-3 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 focus:ring-2 focus:ring-green-500 text-sm font-medium"
+                className="px-4 py-3 border border-green-200 text-green-700 rounded-lg hover:bg-green-50 focus:ring-2 focus:ring-green-500 text-sm font-medium"
                 title="Add new supplier"
               >
                 +
@@ -449,14 +449,14 @@ export default function CreateVoucherPage() {
 
             {/* Add Supplier Form */}
             {showAddSupplier && (
-              <div className="mt-2 p-3 bg-gray-50 rounded-md border">
-                <div className="flex gap-2">
+              <div className="mt-3 p-4 bg-gray-50 rounded-lg border">
+                <div className="flex gap-3">
                   <input
                     type="text"
                     value={newSupplierName}
                     onChange={(e) => setNewSupplierName(e.target.value)}
                     placeholder="Enter supplier name"
-                    className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 text-sm"
+                    className="flex-1 px-3 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
                     onKeyPress={(e) => {
                       if (e.key === "Enter") {
                         handleAddSupplier();
@@ -466,7 +466,7 @@ export default function CreateVoucherPage() {
                   <button
                     type="button"
                     onClick={handleAddSupplier}
-                    className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:ring-2 focus:ring-blue-500 text-sm"
+                    className="px-5 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:ring-2 focus:ring-blue-500 text-sm"
                   >
                     Add
                   </button>
@@ -476,7 +476,7 @@ export default function CreateVoucherPage() {
                       setShowAddSupplier(false);
                       setNewSupplierName("");
                     }}
-                    className="px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600 focus:ring-2 focus:ring-gray-500 text-sm"
+                    className="px-5 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 focus:ring-2 focus:ring-gray-300 text-sm"
                   >
                     Cancel
                   </button>
@@ -496,7 +496,7 @@ export default function CreateVoucherPage() {
               onChange={async (e) =>
                 await handleInputChange("modeOfPayment", e.target.value)
               }
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
               placeholder="Enter mode of payment"
             />
           </div>
@@ -516,7 +516,7 @@ export default function CreateVoucherPage() {
                   parseFloat(e.target.value) || 0
                 )
               }
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
               placeholder="0.00"
             />
           </div>
@@ -533,7 +533,7 @@ export default function CreateVoucherPage() {
               onChange={async (e) =>
                 await handleInputChange("dues", parseFloat(e.target.value) || 0)
               }
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
               placeholder="0.00"
             />
           </div>
@@ -553,7 +553,7 @@ export default function CreateVoucherPage() {
                   parseFloat(e.target.value) || 0
                 )
               }
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
               placeholder="0.00"
             />
           </div>
@@ -573,7 +573,7 @@ export default function CreateVoucherPage() {
                   parseFloat(e.target.value) || 0
                 )
               }
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
               placeholder="0.00"
             />
           </div>
@@ -587,7 +587,7 @@ export default function CreateVoucherPage() {
               type="number"
               value={formData.netBalance.toFixed(2)}
               readOnly
-              className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-100 text-gray-700"
+              className="w-full px-3 py-3 border border-gray-300 rounded-lg bg-gray-100 text-gray-700"
             />
           </div>
 
@@ -606,7 +606,7 @@ export default function CreateVoucherPage() {
                   parseFloat(e.target.value) || 0
                 )
               }
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
               placeholder="0.00"
             />
           </div>
@@ -622,7 +622,7 @@ export default function CreateVoucherPage() {
               onChange={async (e) =>
                 await handleInputChange("chqCashIssuedDate", e.target.value)
               }
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
             />
           </div>
 
@@ -637,26 +637,26 @@ export default function CreateVoucherPage() {
               onChange={async (e) =>
                 await handleInputChange("voucherClearedDate", e.target.value)
               }
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
             />
           </div>
         </div>
 
         {/* Submit Button */}
-        <div className="mt-8 flex justify-end gap-4">
+        <div className="mt-10 flex justify-end gap-4">
           <button
             onClick={() => {
               setFormData(initialFormData);
               router.push("/");
             }}
-            className="px-6 py-2 rounded-md border text-gray-600 hover:bg-gray-100"
+            className="px-6 py-3 rounded-lg border text-gray-700 hover:bg-gray-50"
           >
             Cancel
           </button>
           <button
             onClick={handleSubmit}
             disabled={isLoading}
-            className="px-6 py-2 rounded-md bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50"
+            className="px-6 py-3 rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50"
           >
             {isLoading ? "Saving..." : "Save Voucher"}
           </button>

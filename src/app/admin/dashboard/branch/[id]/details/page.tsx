@@ -46,6 +46,9 @@ import {
   HoverCardContent,
   HoverCardTrigger,
 } from "@/components/ui/hover-card";
+import { Card, CardContent } from "@/components/ui/card";
+import { Separator } from "@/components/ui/separator";
+import { Checkbox } from "@/components/ui/checkbox";
 
 // Data is fetched from API; no static data here.
 
@@ -68,7 +71,37 @@ export type Voucher = {
   status: "pending" | "active";
 };
 
+// Date range helper
+type DateRange = { from?: string; to?: string };
+const normalizeDate = (value?: string) =>
+  value ? String(value).slice(0, 10) : undefined;
+const isWithinDateRange = (cellValue: unknown, range: DateRange) => {
+  const value = normalizeDate(
+    typeof cellValue === "string" ? cellValue : undefined
+  );
+  if (!value) return false;
+  const fromOk = range.from ? value >= range.from : true;
+  const toOk = range.to ? value <= range.to : true;
+  return fromOk && toOk;
+};
+
 export const columns: ColumnDef<Voucher>[] = [
+  {
+    id: "paid",
+    header: () => <div className="text-xs">Paid</div>,
+    cell: ({ row }) => {
+      const isPaid = Boolean(row.original.voucherClearedDate);
+      return (
+        <Checkbox
+          checked={isPaid}
+          disabled
+          aria-label="Paid status (view only)"
+        />
+      );
+    },
+    enableSorting: false,
+    enableHiding: false,
+  },
   {
     accessorKey: "voucherId",
     header: ({ column }) => {
@@ -90,6 +123,10 @@ export const columns: ColumnDef<Voucher>[] = [
   },
   {
     accessorKey: "date",
+    filterFn: (row, id, value: DateRange) => {
+      if (!value || (!value.from && !value.to)) return true;
+      return isWithinDateRange(row.getValue(id), value);
+    },
     header: ({ column }) => {
       return (
         <Button
@@ -105,6 +142,10 @@ export const columns: ColumnDef<Voucher>[] = [
   },
   {
     accessorKey: "voucherGivenDate",
+    filterFn: (row, id, value: DateRange) => {
+      if (!value || (!value.from && !value.to)) return true;
+      return isWithinDateRange(row.getValue(id), value);
+    },
     header: ({ column }) => {
       return (
         <Button
@@ -219,8 +260,35 @@ export const columns: ColumnDef<Voucher>[] = [
   },
   {
     accessorKey: "voucherClearedDate",
+    filterFn: (row, id, value: DateRange) => {
+      if (!value || (!value.from && !value.to)) return true;
+      return isWithinDateRange(row.getValue(id), value);
+    },
     header: "Voucher Cleared Date",
     cell: ({ row }) => <div>{row.getValue("voucherClearedDate") || "-"}</div>,
+  },
+  {
+    accessorKey: "status",
+    header: "Status",
+    filterFn: (row, id, value: string | undefined) => {
+      if (!value) return true;
+      return (row.getValue(id) as string) === value;
+    },
+    cell: ({ row }) => {
+      const value = row.getValue("status") as "pending" | "active";
+      const isPaid = value === "active";
+      return (
+        <span
+          className={`px-2 py-0.5 rounded text-[10px] font-medium ${
+            isPaid
+              ? "bg-green-100 text-green-700"
+              : "bg-yellow-100 text-yellow-700"
+          }`}
+        >
+          {isPaid ? "Paid" : "Unpaid"}
+        </span>
+      );
+    },
   },
   {
     accessorKey: "remarks",
@@ -275,9 +343,12 @@ export default function page({ params }: { params: Promise<{ id: string }> }) {
     []
   );
   const [columnVisibility, setColumnVisibility] =
-    React.useState<VisibilityState>({});
+    React.useState<VisibilityState>({ status: false });
   const [rowSelection, setRowSelection] = React.useState({});
   const [data, setData] = React.useState<Voucher[]>([]);
+  const [issueDateRange, setIssueDateRange] = React.useState<DateRange>({});
+  const [givenDateRange, setGivenDateRange] = React.useState<DateRange>({});
+  const [clearedDateRange, setClearedDateRange] = React.useState<DateRange>({});
 
   // Unwrap route params
   // eslint-disable-next-line react-hooks/rules-of-hooks
@@ -356,52 +427,220 @@ export default function page({ params }: { params: Promise<{ id: string }> }) {
 
   return (
     <div className="w-full">
-      {/* Summary Dashboard Header */}
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold mb-4">Voucher Summary Dashboard</h1>
-
-        {/* Summary Totals */}
-        <div className="grid grid-cols-2 gap-4 mb-4">
-          <div className="bg-blue-50 p-4 rounded-lg">
-            <div className="text-sm text-blue-600 font-medium">
-              Grand Total Amount
-            </div>
-            <div className="text-2xl font-bold text-blue-700">
-              {new Intl.NumberFormat("en-US", {
-                style: "currency",
-                currency: "USD",
-              }).format(grandTotalAmount)}
-            </div>
+      {/* Header */}
+      <div className="mb-4">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-3">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">
+              Voucher Dashboard
+            </h1>
+            <p className="text-xs text-gray-500 mt-1">
+              Track and manage vouchers by status and dates
+            </p>
           </div>
-          <div className="bg-blue-50 p-4 rounded-lg">
-            <div className="text-sm text-blue-600 font-medium">
-              Grand Total Net Balance
-            </div>
-            <div className="text-2xl font-bold text-blue-700">
-              {new Intl.NumberFormat("en-US", {
-                style: "currency",
-                currency: "USD",
-              }).format(grandTotalNetBalance)}
+        </div>
+
+        {/* KPI Cards */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <Card>
+            <CardContent className="p-3">
+              <div className="text-xs text-gray-500">Total Vouchers</div>
+              <div className="text-xl font-semibold text-gray-900">
+                {data.length}
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-3">
+              <div className="text-xs text-gray-500">Grand Total Amount</div>
+              <div className="text-lg font-bold text-blue-700">
+                {new Intl.NumberFormat("en-US", {
+                  style: "currency",
+                  currency: "USD",
+                }).format(grandTotalAmount)}
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-3">
+              <div className="text-xs text-gray-500">
+                Grand Total Net Balance
+              </div>
+              <div className="text-lg font-bold text-blue-700">
+                {new Intl.NumberFormat("en-US", {
+                  style: "currency",
+                  currency: "USD",
+                }).format(grandTotalNetBalance)}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Filters */}
+        <div className="mt-4 rounded-md border bg-white">
+          <div className="p-3">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
+              <Input
+                placeholder="Search by supplier..."
+                value={
+                  (table.getColumn("supplier")?.getFilterValue() as string) ??
+                  ""
+                }
+                onChange={(event) =>
+                  table
+                    .getColumn("supplier")
+                    ?.setFilterValue(event.target.value)
+                }
+                className="max-w-xs text-sm"
+              />
+              <div className="flex flex-col sm:flex-row gap-3 w-full">
+                <div className="flex items-center gap-2 text-xs">
+                  <span className="whitespace-nowrap">Date:</span>
+                  <input
+                    type="date"
+                    value={issueDateRange.from ?? ""}
+                    onChange={(e) => {
+                      const next = {
+                        ...issueDateRange,
+                        from: e.target.value || undefined,
+                      };
+                      setIssueDateRange(next);
+                      table.getColumn("date")?.setFilterValue(next);
+                    }}
+                    className="px-2 py-1 border border-gray-300 rounded"
+                  />
+                  <span>to</span>
+                  <input
+                    type="date"
+                    value={issueDateRange.to ?? ""}
+                    onChange={(e) => {
+                      const next = {
+                        ...issueDateRange,
+                        to: e.target.value || undefined,
+                      };
+                      setIssueDateRange(next);
+                      table.getColumn("date")?.setFilterValue(next);
+                    }}
+                    className="px-2 py-1 border border-gray-300 rounded"
+                  />
+                </div>
+                <div className="flex items-center gap-2 text-xs">
+                  <span className="whitespace-nowrap">Voucher Given:</span>
+                  <input
+                    type="date"
+                    value={givenDateRange.from ?? ""}
+                    onChange={(e) => {
+                      const next = {
+                        ...givenDateRange,
+                        from: e.target.value || undefined,
+                      };
+                      setGivenDateRange(next);
+                      table.getColumn("voucherGivenDate")?.setFilterValue(next);
+                    }}
+                    className="px-2 py-1 border border-gray-300 rounded"
+                  />
+                  <span>to</span>
+                  <input
+                    type="date"
+                    value={givenDateRange.to ?? ""}
+                    onChange={(e) => {
+                      const next = {
+                        ...givenDateRange,
+                        to: e.target.value || undefined,
+                      };
+                      setGivenDateRange(next);
+                      table.getColumn("voucherGivenDate")?.setFilterValue(next);
+                    }}
+                    className="px-2 py-1 border border-gray-300 rounded"
+                  />
+                </div>
+                <div className="flex items-center gap-2 text-xs">
+                  <span className="whitespace-nowrap">Cleared:</span>
+                  <input
+                    type="date"
+                    value={clearedDateRange.from ?? ""}
+                    onChange={(e) => {
+                      const next = {
+                        ...clearedDateRange,
+                        from: e.target.value || undefined,
+                      };
+                      setClearedDateRange(next);
+                      table
+                        .getColumn("voucherClearedDate")
+                        ?.setFilterValue(next);
+                    }}
+                    className="px-2 py-1 border border-gray-300 rounded"
+                  />
+                  <span>to</span>
+                  <input
+                    type="date"
+                    value={clearedDateRange.to ?? ""}
+                    onChange={(e) => {
+                      const next = {
+                        ...clearedDateRange,
+                        to: e.target.value || undefined,
+                      };
+                      setClearedDateRange(next);
+                      table
+                        .getColumn("voucherClearedDate")
+                        ?.setFilterValue(next);
+                    }}
+                    className="px-2 py-1 border border-gray-300 rounded"
+                  />
+                </div>
+                <div className="flex items-center gap-2 text-xs">
+                  <span className="whitespace-nowrap">Paid:</span>
+                  <select
+                    value={
+                      (table.getColumn("status")?.getFilterValue() as string) ??
+                      ""
+                    }
+                    onChange={(e) =>
+                      table
+                        .getColumn("status")
+                        ?.setFilterValue(e.target.value || undefined)
+                    }
+                    className="px-2 py-1 border border-gray-300 rounded text-xs"
+                  >
+                    <option value="">All</option>
+                    <option value="active">Paid</option>
+                    <option value="pending">Unpaid</option>
+                  </select>
+                </div>
+                <div className="flex items-center gap-2 ml-auto">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="text-xs"
+                    onClick={() => {
+                      setIssueDateRange({});
+                      setGivenDateRange({});
+                      setClearedDateRange({});
+                      table.getColumn("date")?.setFilterValue(undefined);
+                      table
+                        .getColumn("voucherGivenDate")
+                        ?.setFilterValue(undefined);
+                      table
+                        .getColumn("voucherClearedDate")
+                        ?.setFilterValue(undefined);
+                      table.getColumn("supplier")?.setFilterValue("");
+                      table.getColumn("status")?.setFilterValue(undefined);
+                    }}
+                  >
+                    Reset Filters
+                  </Button>
+                </div>
+              </div>
             </div>
           </div>
         </div>
 
-        {/* Search Bar */}
-        <div className="flex items-center py-4">
-          <Input
-            placeholder="Search by name, voucher number..."
-            value={
-              (table.getColumn("supplier")?.getFilterValue() as string) ?? ""
-            }
-            onChange={(event) =>
-              table.getColumn("supplier")?.setFilterValue(event.target.value)
-            }
-            className="max-w-sm"
-          />
+        {/* Columns control outside the filters box */}
+        <div className="flex justify-end items-center mb-2">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="outline" className="ml-auto">
-                Columns <ChevronDown />
+              <Button variant="outline" size="sm" className="text-xs">
+                Columns <ChevronDown className="w-3 h-3" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
@@ -412,7 +651,7 @@ export default function page({ params }: { params: Promise<{ id: string }> }) {
                   return (
                     <DropdownMenuCheckboxItem
                       key={column.id}
-                      className="capitalize"
+                      className="capitalize text-xs"
                       checked={column.getIsVisible()}
                       onCheckedChange={(value) =>
                         column.toggleVisibility(!!value)
@@ -428,57 +667,54 @@ export default function page({ params }: { params: Promise<{ id: string }> }) {
       </div>
 
       {/* Voucher Table */}
-      <div className="overflow-hidden rounded-md border">
-        <Table>
-          <TableHeader>
-            {table.getHeaderGroups().map((headerGroup) => (
-              <TableRow key={headerGroup.id}>
-                {headerGroup.headers.map((header) => {
-                  return (
-                    <TableHead key={header.id}>
-                      {header.isPlaceholder
-                        ? null
-                        : flexRender(
-                            header.column.columnDef.header,
-                            header.getContext()
-                          )}
-                    </TableHead>
-                  );
-                })}
-              </TableRow>
-            ))}
-          </TableHeader>
-          <TableBody>
-            {table.getRowModel().rows?.length ? (
-              table.getRowModel().rows.map((row) => (
-                <TableRow
-                  key={row.id}
-                  className={
-                    row.original.status === "active" ? "bg-green-50" : ""
-                  }
-                >
-                  {row.getVisibleCells().map((cell) => (
-                    <TableCell key={cell.id}>
-                      {flexRender(
-                        cell.column.columnDef.cell,
-                        cell.getContext()
-                      )}
-                    </TableCell>
-                  ))}
+      <div className="overflow-x-auto rounded-md border bg-white">
+        <div className="min-w-full">
+          <Table>
+            <TableHeader className="sticky top-0 z-10 bg-white">
+              {table.getHeaderGroups().map((headerGroup) => (
+                <TableRow key={headerGroup.id}>
+                  {headerGroup.headers.map((header) => {
+                    return (
+                      <TableHead key={header.id} className="text-sm p-3">
+                        {header.isPlaceholder
+                          ? null
+                          : flexRender(
+                              header.column.columnDef.header,
+                              header.getContext()
+                            )}
+                      </TableHead>
+                    );
+                  })}
                 </TableRow>
-              ))
-            ) : (
-              <TableRow>
-                <TableCell
-                  colSpan={columns.length}
-                  className="h-24 text-center"
-                >
-                  No results.
-                </TableCell>
-              </TableRow>
-            )}
-          </TableBody>
-        </Table>
+              ))}
+            </TableHeader>
+            <TableBody>
+              {table.getRowModel().rows?.length ? (
+                table.getRowModel().rows.map((row) => (
+                  <TableRow key={row.id}>
+                    {row.getVisibleCells().map((cell) => (
+                      <TableCell key={cell.id} className="text-sm p-3">
+                        {flexRender(
+                          cell.column.columnDef.cell,
+                          cell.getContext()
+                        )}
+                      </TableCell>
+                    ))}
+                  </TableRow>
+                ))
+              ) : (
+                <TableRow>
+                  <TableCell
+                    colSpan={columns.length}
+                    className="h-24 text-center text-sm text-gray-500"
+                  >
+                    No results.
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </div>
       </div>
 
       {/* Pagination and Row Selection */}

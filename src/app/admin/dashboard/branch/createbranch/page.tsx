@@ -120,9 +120,14 @@ export default function LoginForm() {
     setSuccess("Form submitted successfully!");
     const res = await fetch("/api/branch", {
       method: "POST",
-      body: JSON.stringify({ branchName: formData.branchName, username: formData.username, password: formData.password, vouchers: formData.vouchers }),
+      body: JSON.stringify({
+        branchName: formData.branchName,
+        username: formData.username,
+        password: formData.password,
+        vouchers: formData.vouchers,
+      }),
       headers: { "Content-Type": "application/json" },
-    }); 
+    });
     // Reset form after successful submission
     setTimeout(() => {
       setFormData({
@@ -136,10 +141,10 @@ export default function LoginForm() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
-      <div className="bg-white rounded-xl shadow-lg w-full max-w-lg p-6">
-        <div className="text-center mb-6">
-          <h2 className="text-2xl font-bold text-gray-800 mb-2">
+    <div className="min-h-screen bg-transparent flex items-start justify-center p-6">
+      <div className="w-full max-w-5xl">
+        <div className="mb-8">
+          <h2 className="text-3xl font-semibold text-gray-900 mb-1">
             Create Branch
           </h2>
           <p className="text-sm text-gray-600">
@@ -162,170 +167,179 @@ export default function LoginForm() {
             </div>
           )}
 
-          {/* Branch Name Field */}
-          <div className="relative">
-            <label
-              htmlFor="branchName"
-              className="block text-sm font-medium text-gray-700 mb-1"
-            >
-              Branch Name
-            </label>
-            <div className="relative">
-              <MapPin className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-              <input
-                type="text"
-                id="branchName"
-                name="branchName"
-                value={formData.branchName}
-                onChange={handleInputChange}
-                className="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all duration-200 text-sm"
-                placeholder="Enter branch name"
-              />
-            </div>
-          </div>
-
-          {/* Username Field */}
-          <div className="relative">
-            <label
-              htmlFor="username"
-              className="block text-sm font-medium text-gray-700 mb-1"
-            >
-              Username
-            </label>
-            <div className="relative">
-              <User className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-              <input
-                type="text"
-                id="username"
-                name="username"
-                value={formData.username}
-                onChange={handleInputChange}
-                className="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all duration-200 text-sm"
-                placeholder="Enter username"
-              />
-            </div>
-          </div>
-
-          {/* Password Field */}
-          <div className="relative">
-            <label
-              htmlFor="password"
-              className="block text-sm font-medium text-gray-700 mb-1"
-            >
-              Password
-            </label>
-            <div className="relative">
-              <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-              <input
-                type={showPassword ? "text" : "password"}
-                id="password"
-                name="password"
-                value={formData.password}
-                onChange={handleInputChange}
-                className="w-full pl-9 pr-12 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all duration-200 text-sm"
-                placeholder="Enter password"
-              />
-              <button
-                type="button"
-                onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors p-1"
-              >
-                {showPassword ? (
-                  <EyeOff className="w-4 h-4" />
-                ) : (
-                  <Eye className="w-4 h-4" />
-                )}
-              </button>
-            </div>
-          </div>
-
-          {/* Vouchers Section */}
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <label className="block text-sm font-medium text-gray-700">
-                Vouchers
-              </label>
-              <button
-                type="button"
-                onClick={addVoucher}
-                className="flex items-center gap-1 px-2 py-1 text-xs bg-blue-100 text-blue-600 rounded-md hover:bg-blue-200 transition-colors"
-              >
-                <Plus className="w-3 h-3" />
-                Add
-              </button>
-            </div>
-
-            <div className="max-h-48 overflow-y-auto space-y-2">
-              {formData.vouchers.map((voucher, index) => (
-                <div
-                  key={index}
-                  className="border border-gray-200 rounded-lg p-3 space-y-2 bg-gray-50"
+          {/* Two-column layout */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            {/* Left: Branch, Username, Password */}
+            <div className="space-y-4">
+              {/* Branch Name Field */}
+              <div className="relative">
+                <label
+                  htmlFor="branchName"
+                  className="block text-sm font-medium text-gray-700 mb-1"
                 >
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-medium text-gray-600">
-                      Voucher {index + 1}
-                    </span>
-                    {formData.vouchers.length > 1 && (
-                      <button
-                        type="button"
-                        onClick={() => removeVoucher(index)}
-                        className="text-red-500 hover:text-red-700 p-1"
-                      >
-                        <X className="w-3 h-3" />
-                      </button>
-                    )}
-                  </div>
-
-                  {/* Voucher Name */}
-                  <div className="relative">
-                    <Receipt className="absolute left-2 top-1/2 transform -translate-y-1/2 text-gray-400 w-3 h-3" />
-                    <input
-                      type="text"
-                      value={voucher.name}
-                      onChange={(e) =>
-                        handleVoucherChange(index, "name", e.target.value)
-                      }
-                      className="w-full pl-7 pr-2 py-1.5 border border-gray-300 rounded-md focus:ring-1 focus:ring-blue-500 focus:border-transparent outline-none transition-all duration-200 text-sm bg-white"
-                      placeholder="Name (e.g., ABC)"
-                    />
-                  </div>
-
-                  {/* Voucher Range */}
-                  <div className="grid grid-cols-2 gap-2">
-                    <input
-                      type="number"
-                      min="1"
-                      value={voucher.start}
-                      onChange={(e) =>
-                        handleVoucherChange(index, "start", e.target.value)
-                      }
-                      className="w-full px-2 py-1.5 border border-gray-300 rounded-md focus:ring-1 focus:ring-blue-500 focus:border-transparent outline-none transition-all duration-200 text-sm bg-white text-center"
-                      placeholder="Start"
-                    />
-                    <input
-                      type="number"
-                      min="1"
-                      value={voucher.end}
-                      onChange={(e) =>
-                        handleVoucherChange(index, "end", e.target.value)
-                      }
-                      className="w-full px-2 py-1.5 border border-gray-300 rounded-md focus:ring-1 focus:ring-blue-500 focus:border-transparent outline-none transition-all duration-200 text-sm bg-white text-center"
-                      placeholder="End"
-                    />
-                  </div>
+                  Branch Name
+                </label>
+                <div className="relative">
+                  <MapPin className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                  <input
+                    type="text"
+                    id="branchName"
+                    name="branchName"
+                    value={formData.branchName}
+                    onChange={handleInputChange}
+                    className="w-full pl-9 pr-3 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all duration-200 text-base"
+                    placeholder="Enter branch name"
+                  />
                 </div>
-              ))}
+              </div>
+
+              {/* Username Field */}
+              <div className="relative">
+                <label
+                  htmlFor="username"
+                  className="block text-sm font-medium text-gray-700 mb-1"
+                >
+                  Username
+                </label>
+                <div className="relative">
+                  <User className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                  <input
+                    type="text"
+                    id="username"
+                    name="username"
+                    value={formData.username}
+                    onChange={handleInputChange}
+                    className="w-full pl-9 pr-3 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all duration-200 text-base"
+                    placeholder="Enter username"
+                  />
+                </div>
+              </div>
+
+              {/* Password Field */}
+              <div className="relative">
+                <label
+                  htmlFor="password"
+                  className="block text-sm font-medium text-gray-700 mb-1"
+                >
+                  Password
+                </label>
+                <div className="relative">
+                  <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                  <input
+                    type={showPassword ? "text" : "password"}
+                    id="password"
+                    name="password"
+                    value={formData.password}
+                    onChange={handleInputChange}
+                    className="w-full pl-9 pr-12 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all duration-200 text-base"
+                    placeholder="Enter password"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors p-1"
+                  >
+                    {showPassword ? (
+                      <EyeOff className="w-4 h-4" />
+                    ) : (
+                      <Eye className="w-4 h-4" />
+                    )}
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Right: Vouchers and Submit */}
+            <div className="space-y-4">
+              {/* Vouchers Section */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <label className="block text-sm font-medium text-gray-700">
+                    Vouchers
+                  </label>
+                  <button
+                    type="button"
+                    onClick={addVoucher}
+                    className="flex items-center gap-1 px-3 py-1.5 text-xs border border-blue-200 text-blue-700 rounded-md hover:bg-blue-50 transition-colors"
+                  >
+                    <Plus className="w-3 h-3" />
+                    Add
+                  </button>
+                </div>
+
+                <div className="max-h-64 overflow-y-auto space-y-3">
+                  {formData.vouchers.map((voucher, index) => (
+                    <div
+                      key={index}
+                      className="border border-gray-200 rounded-lg p-4 space-y-3"
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-medium text-gray-600">
+                          Voucher {index + 1}
+                        </span>
+                        {formData.vouchers.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => removeVoucher(index)}
+                            className="text-red-500 hover:text-red-700 p-1"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        )}
+                      </div>
+
+                      {/* Voucher Name */}
+                      <div className="relative">
+                        <Receipt className="absolute left-2 top-1/2 transform -translate-y-1/2 text-gray-400 w-3 h-3" />
+                        <input
+                          type="text"
+                          value={voucher.name}
+                          onChange={(e) =>
+                            handleVoucherChange(index, "name", e.target.value)
+                          }
+                          className="w-full pl-7 pr-2 py-2 border border-gray-300 rounded-md focus:ring-1 focus:ring-blue-500 focus:border-transparent outline-none transition-all duration-200 text-base"
+                          placeholder="Name (e.g., ABC)"
+                        />
+                      </div>
+
+                      {/* Voucher Range */}
+                      <div className="grid grid-cols-2 gap-3">
+                        <input
+                          type="number"
+                          min="1"
+                          value={voucher.start}
+                          onChange={(e) =>
+                            handleVoucherChange(index, "start", e.target.value)
+                          }
+                          className="w-full px-2 py-2 border border-gray-300 rounded-md focus:ring-1 focus:ring-blue-500 focus:border-transparent outline-none transition-all duration-200 text-base text-center"
+                          placeholder="Start"
+                        />
+                        <input
+                          type="number"
+                          min="1"
+                          value={voucher.end}
+                          onChange={(e) =>
+                            handleVoucherChange(index, "end", e.target.value)
+                          }
+                          className="w-full px-2 py-2 border border-gray-300 rounded-md focus:ring-1 focus:ring-blue-500 focus:border-transparent outline-none transition-all duration-200 text-base text-center"
+                          placeholder="End"
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Submit Button */}
+              <button
+                type="button"
+                onClick={handleSubmit}
+                className="w-full bg-blue-600 text-white py-3 px-4 rounded-lg font-medium hover:bg-blue-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all duration-200 text-base"
+              >
+                Create Branch
+              </button>
             </div>
           </div>
-
-          {/* Submit Button */}
-          <button
-            type="button"
-            onClick={handleSubmit}
-            className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 text-white py-2.5 px-4 rounded-lg font-medium hover:from-blue-700 hover:to-indigo-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transform hover:scale-105 transition-all duration-200 shadow-md text-sm"
-          >
-            Create Branch
-          </button>
         </div>
       </div>
     </div>

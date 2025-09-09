@@ -510,14 +510,7 @@ export default function page() {
               <Edit className="h-4 w-4" />
               <span className="sr-only">Edit voucher</span>
             </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-8 w-8 p-0 text-red-600 hover:text-red-700"
-            >
-              <Trash2 className="h-4 w-4" />
-              <span className="sr-only">Delete voucher</span>
-            </Button>
+      
           </div>
         );
       },
