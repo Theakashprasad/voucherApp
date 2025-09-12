@@ -10,7 +10,26 @@ export async function GET(
     const { id } = await context.params; // branchId
     await connectDb();
     const vouchers = await VoucherEntry.find({ branchId: id });
-    return NextResponse.json(vouchers, { status: 200 });
+
+    // Calculate grand total amount
+    const grandTotalAmount = vouchers.reduce(
+      (sum, voucher) => sum + (voucher.amount || 0),
+      0
+    );
+    const grandTotalNetBalance = vouchers.reduce(
+      (sum, voucher) => sum + (voucher.netBalance || 0),
+      0
+    );
+
+    return NextResponse.json(
+      {
+        vouchers,
+        grandTotalAmount,
+        grandTotalNetBalance,
+        totalCount: vouchers.length,
+      },
+      { status: 200 }
+    );
   } catch (error) {
     return NextResponse.json(
       { success: false, error: "Error fetching vouchers" },

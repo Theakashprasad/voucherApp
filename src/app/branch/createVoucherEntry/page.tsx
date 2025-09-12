@@ -1,23 +1,15 @@
 "use client";
 import React, { useEffect, useState } from "react";
-import { number } from "zod";
 import { useRouter } from "next/navigation";
 
 interface VoucherFormData {
   voucherBookRange: string;
   voucherNo: string;
   invoiceNo: string;
-  date: string;
+  voucherGivenDate: string;
   supplier: string;
   amount: number;
-  dues: number;
-  return: number;
-  discountAdvance: number;
-  netBalance: number;
-  modeOfPayment: string;
-  chqCashIssuedDate: string;
-  amountPaid: number;
-  voucherClearedDate: string;
+  remarks: string;
 }
 
 interface FormErrors {
@@ -34,17 +26,10 @@ const initialFormData: VoucherFormData = {
   voucherBookRange: "",
   voucherNo: "",
   invoiceNo: "",
-  date: "",
+  voucherGivenDate: "",
   supplier: "",
   amount: 0,
-  dues: 0,
-  return: 0,
-  discountAdvance: 0,
-  netBalance: 0,
-  modeOfPayment: "",
-  chqCashIssuedDate: "",
-  amountPaid: 0,
-  voucherClearedDate: "",
+  remarks: "",
 };
 
 export default function CreateVoucherPage() {
@@ -80,7 +65,6 @@ export default function CreateVoucherPage() {
         const res = await fetch(`/api/branch/${branchIdFromStorage}`);
         if (res.ok) {
           const branchData = await res.json();
-          console.log("Branch data from API:", branchData);
 
           // Load vouchers from API response
           const vouchers = Array.isArray(branchData?.vouchers)
@@ -158,18 +142,31 @@ export default function CreateVoucherPage() {
                 .map((v: string) => parseInt(v, 10))
                 .filter((n: number) => !isNaN(n));
               setReservedNumbers(usedNumbers);
-              // Calculate maxReserved based on current reservedNumbers
+              // Calculate next available number, but don't exceed the book's end range
+              const startRange = selectedBook.startRange;
+              const endRange = selectedBook.endRange;
               const nextNumbervalue = usedNumbers.length
-                ? Math.max(...usedNumbers) + 1
-                : null;
-              console.log("sdsd", nextNumbervalue);
-              setNextNumber(nextNumbervalue);
+                ? Math.min(Math.max(...usedNumbers) + 1, endRange + 1) // Don't exceed end range
+                : startRange;
+
+              // If all numbers in range are used, don't suggest next number
+              const isRangeExhausted =
+                usedNumbers.length === endRange - startRange + 1;
+              const finalNextNumber = isRangeExhausted ? null : nextNumbervalue;
+
+              setNextNumber(finalNextNumber);
               setFormData((prev) => ({
                 ...prev,
-                voucherNo: String(nextNumbervalue),
+                voucherNo: finalNextNumber ? String(finalNextNumber) : "",
               }));
             } else {
               setReservedNumbers([]);
+              // If no used numbers, suggest the start of the range
+              setNextNumber(selectedBook.startRange);
+              setFormData((prev) => ({
+                ...prev,
+                voucherNo: String(selectedBook.startRange),
+              }));
             }
           } else {
             setReservedNumbers([]);
@@ -183,25 +180,7 @@ export default function CreateVoucherPage() {
       }
     }
 
-    setFormData((prev) => {
-      const updated = { ...prev, [field]: value };
-
-      if (["amount", "dues", "return", "discountAdvance"].includes(field)) {
-        const amount =
-          field === "amount" ? Number(value) : Number(updated.amount);
-        const dues = field === "dues" ? Number(value) : Number(updated.dues);
-        const returnAmount =
-          field === "return" ? Number(value) : Number(updated.return);
-        const discountAdvance =
-          field === "discountAdvance"
-            ? Number(value)
-            : Number(updated.discountAdvance);
-
-        updated.netBalance = amount - dues - returnAmount - discountAdvance;
-      }
-
-      return updated;
-    });
+    setFormData((prev) => ({ ...prev, [field]: value }));
 
     if (errors[field]) {
       setErrors((prev) => ({ ...prev, [field]: "" }));
@@ -225,8 +204,8 @@ export default function CreateVoucherPage() {
         alert("Please select a Voucher Number.");
         return;
       }
-      if (!formData.date) {
-        alert("Please select a Date.");
+      if (!formData.voucherGivenDate) {
+        alert("Please select a Voucher Given Date.");
         return;
       }
       if (!formData.supplier) {
@@ -238,20 +217,13 @@ export default function CreateVoucherPage() {
         branchId,
         voucherBookName: formData.voucherBookRange,
         voucherNo: formData.voucherNo ?? nextNumber,
-        date: formData.date,
-        voucherGivenDate: formData.date,
+        invoiceNo: formData.invoiceNo,
+        voucherGivenDate: formData.voucherGivenDate,
         supplier: formData.supplier,
         amount: formData.amount,
-        dues: formData.dues,
-        return: formData.return,
-        discountAdvance: formData.discountAdvance,
-        netBalance: formData.netBalance,
-        modeOfPayment: (formData.modeOfPayment || "CASH").toUpperCase(),
-        chqCashIssuedDate: formData.chqCashIssuedDate || null,
-        amountPaid: formData.amountPaid,
-        voucherClearedDate: formData.voucherClearedDate || null,
-        remarks: formData.invoiceNo || "",
-        status: formData.voucherClearedDate ? "active" : "pending",
+        // other fields will be defaulted in API
+        remarks: formData.remarks || "",
+        status: "pending",
       };
 
       const res = await fetch("/api/voucherEntry", {
@@ -267,6 +239,7 @@ export default function CreateVoucherPage() {
       }
 
       alert("Voucher saved successfully!");
+      setNextNumber(null);
       setFormData(initialFormData);
     } catch (error) {
       alert("Error saving voucher. Please try again.");
@@ -349,7 +322,6 @@ export default function CreateVoucherPage() {
             <select
               value={formData.voucherNo}
               onChange={async (e) => {
-                console.log("asdf", e.target.value);
                 await handleInputChange(
                   "voucherNo",
                   e.target.value ?? nextNumber
@@ -362,7 +334,7 @@ export default function CreateVoucherPage() {
                 {nextNumber !== null
                   ? String(nextNumber)
                   : formData.voucherBookRange
-                  ? "Select Voucher Number"
+                  ? "No available numbers in this range"
                   : "Select Voucher Book First"}
               </option>
               {formData.voucherBookRange &&
@@ -402,16 +374,16 @@ export default function CreateVoucherPage() {
             />
           </div>
 
-          {/* Date */}
+          {/* Voucher Given Date */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Date
+              Voucher Given Date
             </label>
             <input
               type="date"
-              value={formData.date}
+              value={formData.voucherGivenDate}
               onChange={async (e) =>
-                await handleInputChange("date", e.target.value)
+                await handleInputChange("voucherGivenDate", e.target.value)
               }
               className="w-full px-3 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
             />
@@ -485,21 +457,7 @@ export default function CreateVoucherPage() {
             )}
           </div>
 
-          {/* Mode of Payment */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Mode of Payment
-            </label>
-            <input
-              type="text"
-              value={formData.modeOfPayment}
-              onChange={async (e) =>
-                await handleInputChange("modeOfPayment", e.target.value)
-              }
-              className="w-full px-3 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-              placeholder="Enter mode of payment"
-            />
-          </div>
+          {/* Mode of Payment moved to edit page */}
 
           {/* Amount */}
           <div>
@@ -521,125 +479,35 @@ export default function CreateVoucherPage() {
             />
           </div>
 
-          {/* Dues */}
+          {/* Remarks */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Dues
+              Remarks
             </label>
-            <input
-              type="number"
-              step="0.01"
-              value={formData.dues || ""}
+            <textarea
+              value={formData.remarks}
               onChange={async (e) =>
-                await handleInputChange("dues", parseFloat(e.target.value) || 0)
+                await handleInputChange("remarks", e.target.value)
               }
               className="w-full px-3 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-              placeholder="0.00"
+              placeholder="Enter remarks"
+              rows={3}
             />
           </div>
 
-          {/* Return */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Return
-            </label>
-            <input
-              type="number"
-              step="0.01"
-              value={formData.return || ""}
-              onChange={async (e) =>
-                await handleInputChange(
-                  "return",
-                  parseFloat(e.target.value) || 0
-                )
-              }
-              className="w-full px-3 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-              placeholder="0.00"
-            />
-          </div>
+          {/* Dues moved to edit page */}
 
-          {/* Discount/Advance */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Discount / Advance
-            </label>
-            <input
-              type="number"
-              step="0.01"
-              value={formData.discountAdvance || ""}
-              onChange={async (e) =>
-                await handleInputChange(
-                  "discountAdvance",
-                  parseFloat(e.target.value) || 0
-                )
-              }
-              className="w-full px-3 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-              placeholder="0.00"
-            />
-          </div>
+          {/* Return moved to edit page */}
 
-          {/* Net Balance */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Net Balance
-            </label>
-            <input
-              type="number"
-              value={formData.netBalance.toFixed(2)}
-              readOnly
-              className="w-full px-3 py-3 border border-gray-300 rounded-lg bg-gray-100 text-gray-700"
-            />
-          </div>
+          {/* Discount/Advance moved to edit page */}
 
-          {/* Amount Paid */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Amount Paid
-            </label>
-            <input
-              type="number"
-              step="0.01"
-              value={formData.amountPaid || ""}
-              onChange={async (e) =>
-                await handleInputChange(
-                  "amountPaid",
-                  parseFloat(e.target.value) || 0
-                )
-              }
-              className="w-full px-3 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-              placeholder="0.00"
-            />
-          </div>
+          {/* Net Balance moved to edit page */}
 
-          {/* CHQ/Cash Issued Date */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              CHQ / Cash Issued Date
-            </label>
-            <input
-              type="date"
-              value={formData.chqCashIssuedDate}
-              onChange={async (e) =>
-                await handleInputChange("chqCashIssuedDate", e.target.value)
-              }
-              className="w-full px-3 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
+          {/* Amount Paid moved to edit page */}
 
-          {/* Voucher Cleared Date */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Voucher Cleared Date
-            </label>
-            <input
-              type="date"
-              value={formData.voucherClearedDate}
-              onChange={async (e) =>
-                await handleInputChange("voucherClearedDate", e.target.value)
-              }
-              className="w-full px-3 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
+          {/* CHQ / Cash Issued Date moved to edit page */}
+
+          {/* Voucher Cleared Date moved to edit page */}
         </div>
 
         {/* Submit Button */}

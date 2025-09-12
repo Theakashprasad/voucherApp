@@ -1,5 +1,4 @@
 import mongoose, { Schema, Document } from "mongoose";
-import { string } from "zod";
 
 interface IVoucher {
   name: string;

@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-import bcrypt from "bcryptjs";
 import connectDb from "@/lib/mongodb";
 import Branch from "@/model/branch";
 
@@ -71,7 +70,6 @@ export async function GET(
     await connectDb();
 
     const branch = await Branch.findById(id);
-    console.log("asdfk", branch);
     if (!branch) {
       return NextResponse.json(
         { message: "Branch not found" },

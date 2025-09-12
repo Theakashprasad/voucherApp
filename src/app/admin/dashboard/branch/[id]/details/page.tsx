@@ -16,7 +16,6 @@ import {
 import {
   ArrowUpDown,
   ChevronDown,
-  MoreHorizontal,
   Edit,
   Trash2,
 } from "lucide-react";
@@ -26,9 +25,6 @@ import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
   DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
@@ -47,14 +43,13 @@ import {
   HoverCardTrigger,
 } from "@/components/ui/hover-card";
 import { Card, CardContent } from "@/components/ui/card";
-import { Separator } from "@/components/ui/separator";
 import { Checkbox } from "@/components/ui/checkbox";
 
 // Data is fetched from API; no static data here.
 
 export type Voucher = {
   id: string;
-  voucherId: string;
+  voucherNo: string;
   date: string;
   voucherGivenDate: string;
   supplier: string;
@@ -103,21 +98,21 @@ export const columns: ColumnDef<Voucher>[] = [
     enableHiding: false,
   },
   {
-    accessorKey: "voucherId",
+    accessorKey: "voucherNo",
     header: ({ column }) => {
       return (
         <Button
           variant="ghost"
           onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
         >
-          Voucher ID
+          Voucher No
           <ArrowUpDown className="ml-2 h-4 w-4" />
         </Button>
       );
     },
     cell: ({ row }) => (
       <div className="font-mono font-medium text-blue-600">
-        {row.getValue("voucherId")}
+        {row.getValue("voucherNo")}
       </div>
     ),
   },
@@ -314,8 +309,8 @@ export const columns: ColumnDef<Voucher>[] = [
   {
     id: "actions",
     enableHiding: false,
-    cell: ({ row }) => {
-      const voucher = row.original;
+    cell: () => {
+      // const voucher = row.original;
 
       return (
         <div className="flex space-x-2">
@@ -337,21 +332,19 @@ export const columns: ColumnDef<Voucher>[] = [
   },
 ];
 
-export default function page({ params }: { params: Promise<{ id: string }> }) {
+export default function Page({ params }: { params: Promise<{ id: string }> }) {
   const [sorting, setSorting] = React.useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>(
     []
   );
   const [columnVisibility, setColumnVisibility] =
     React.useState<VisibilityState>({ status: false });
-  const [rowSelection, setRowSelection] = React.useState({});
   const [data, setData] = React.useState<Voucher[]>([]);
   const [issueDateRange, setIssueDateRange] = React.useState<DateRange>({});
   const [givenDateRange, setGivenDateRange] = React.useState<DateRange>({});
   const [clearedDateRange, setClearedDateRange] = React.useState<DateRange>({});
 
-  // Unwrap route params
-  // eslint-disable-next-line react-hooks/rules-of-hooks
+
   const { id: branchId } = React.use(params);
 
   // Fetch vouchers for this branch
@@ -365,7 +358,7 @@ export default function page({ params }: { params: Promise<{ id: string }> }) {
         const mapped: Voucher[] = Array.isArray(vouchers)
           ? vouchers.map((v: any) => ({
               id: String(v._id),
-              voucherId: String(v.voucherNo ?? ""),
+              voucherNo: String(v.voucherNo ?? ""),
               date: v.date ? String(v.date).slice(0, 10) : "",
               voucherGivenDate: v.voucherGivenDate
                 ? String(v.voucherGivenDate).slice(0, 10)

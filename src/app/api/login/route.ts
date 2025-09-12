@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import jwt from "jsonwebtoken";
 import connectDb from "@/lib/mongodb";
 import Branch from "../../../model/branch";
+import Admin from "../../../model/admin";
 
 const JWT_SECRET = process.env.JWT_SECRET as string;
 
@@ -9,7 +10,47 @@ export async function POST(req: Request) {
   try {
     const { username, password } = await req.json();
     await connectDb();
+    // Admin login (plaintext password check as requested)
+    if (username === "Adminlazzanio") {
+      const admin = await Admin.findOne({ username: "Adminlazzanio" });
+      if (!admin || admin.password !== password) {
+        return NextResponse.json(
+          { success: false, error: "Invalid admin credentials" },
+          { status: 401 }
+        );
+      }
 
+      const token = jwt.sign(
+        { id: String(admin._id), username: admin.username, role: "admin" },
+        JWT_SECRET,
+        { expiresIn: "1d" }
+      );
+
+      const res = NextResponse.json({
+        success: true,
+        message: "Login successful",
+        token,
+        admin: { _id: String(admin._id), username: admin.username },
+        role: "admin",
+      });
+
+      res.cookies.set("token", token, {
+        httpOnly: false,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "strict",
+        path: "/",
+        maxAge: 60 * 60 * 24,
+      });
+      res.cookies.set("role", "admin", {
+        httpOnly: false,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "strict",
+        path: "/",
+        maxAge: 60 * 60 * 24,
+      });
+
+      return res;
+    }
     const branch = await Branch.findOne({ username });
     if (!branch) {
       return NextResponse.json(
@@ -18,7 +59,7 @@ export async function POST(req: Request) {
       );
     }
 
-    const isMatch = branch.password === password; 
+    const isMatch = branch.password === password;
     if (!isMatch) {
       return NextResponse.json(
         { success: false, error: "Invalid password" },
@@ -27,19 +68,32 @@ export async function POST(req: Request) {
     }
 
     const token = jwt.sign(
-      { id: branch._id, username: branch.username },
+      { id: branch._id, username: branch.username, role: "user" },
       JWT_SECRET,
       { expiresIn: "1d" }
     );
 
-    const res = NextResponse.json({ success: true, message: "Login successful",branch });
+    const res = NextResponse.json({
+      success: true,
+      message: "Login successful",
+      branch,
+      token,
+      role: "user",
+    });
 
     res.cookies.set("token", token, {
-      httpOnly: true,
+      httpOnly: false,
       secure: process.env.NODE_ENV === "production",
       sameSite: "strict",
       path: "/",
       maxAge: 60 * 60 * 24, // 1 day
+    });
+    res.cookies.set("role", "user", {
+      httpOnly: false,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "strict",
+      path: "/",
+      maxAge: 60 * 60 * 24,
     });
 
     return res;

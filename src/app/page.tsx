@@ -14,11 +14,10 @@ import {
   useReactTable,
   VisibilityState,
 } from "@tanstack/react-table";
-import { ArrowUpDown, ChevronDown, Edit, Trash2 } from "lucide-react";
+import { ArrowUpDown, ChevronDown, Edit } from "lucide-react";
 import { useRouter } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -41,107 +40,17 @@ import {
 } from "@/components/ui/hover-card";
 import Navbar from "@/components/common/navbar";
 import { SupplierDialog } from "@/components/supplier/page";
+import { VoucherBookDialog } from "@/components/voucherBook/page";
 import { toast } from "sonner";
 import { Card, CardContent } from "@/components/ui/card";
-import { Separator } from "@/components/ui/separator";
-
-// const voucherData: Voucher[] = [
-//   {
-//     id: "1",
-//     voucherNo: "V001",
-//     date: "2025-08-25",
-//     voucherGivenDate: "2025-08-20",
-//     supplier: "ID FRESH FOOD",
-//     amount: 15000.0,
-//     dues: 0.0,
-//     return: 0.0,
-//     discountAdvance: 0.0,
-//     netBalance: 15000.0,
-//     modeOfPayment: "B",
-//     chqCashIssuedDate: "",
-//     amountPaid: 0.0,
-//     voucherClearedDate: "",
-//     remarks: "Fresh food supplies for restaurant",
-//     status: "pending",
-//   },
-//   {
-//     id: "2",
-//     voucherNo: "V002",
-//     date: "2025-08-25",
-//     voucherGivenDate: "2025-08-21",
-//     supplier: "ASAL FOOD",
-//     amount: 2500.0,
-//     dues: 0.0,
-//     return: 0.0,
-//     discountAdvance: 0.0,
-//     netBalance: 2500.0,
-//     modeOfPayment: "B",
-//     chqCashIssuedDate: "",
-//     amountPaid: 0.0,
-//     voucherClearedDate: "",
-//     remarks: "Spices and condiments",
-//     status: "pending",
-//   },
-//   {
-//     id: "3",
-//     voucherNo: "V003",
-//     date: "2025-08-24",
-//     voucherGivenDate: "2025-08-19",
-//     supplier: "UNITED MARKETING",
-//     amount: 2500.0,
-//     dues: 0.0,
-//     return: 0.0,
-//     discountAdvance: 0.0,
-//     netBalance: 2500.0,
-//     modeOfPayment: "CHQ",
-//     chqCashIssuedDate: "",
-//     amountPaid: 2500.0,
-//     voucherClearedDate: "2025-08-25",
-//     remarks: "Marketing materials and promotional items",
-//     status: "cleared",
-//   },
-//   {
-//     id: "4",
-//     voucherNo: "V004",
-//     date: "2025-08-23",
-//     voucherGivenDate: "2025-08-18",
-//     supplier: "PREMIUM SUPPLIERS",
-//     amount: 8000.0,
-//     dues: 1000.0,
-//     return: 500.0,
-//     discountAdvance: 200.0,
-//     netBalance: 6300.0,
-//     modeOfPayment: "CASH",
-//     chqCashIssuedDate: "2025-08-23",
-//     amountPaid: 6300.0,
-//     voucherClearedDate: "2025-08-23",
-//     remarks: "Premium quality ingredients for special menu",
-//     status: "cleared",
-//   },
-//   {
-//     id: "5",
-//     voucherNo: "V005",
-//     date: "2025-08-22",
-//     voucherGivenDate: "2025-08-17",
-//     supplier: "QUALITY FOODS",
-//     amount: 12000.0,
-//     dues: 2000.0,
-//     return: 0.0,
-//     discountAdvance: 0.0,
-//     netBalance: 10000.0,
-//     modeOfPayment: "CHQ",
-//     chqCashIssuedDate: "",
-//     amountPaid: 0.0,
-//     voucherClearedDate: "",
-//     remarks: "Bulk food supplies for catering events",
-//     status: "pending",
-//   },
-// ];
+import { ConfirmDialog } from "@/components/common/ConfirmDialog";
 
 export type Voucher = {
   _id: string;
   voucherNo: string;
-  date: string;
+  voucherBook: string;
+  invoiceNo?: string;
+  createdAt?: string;
   voucherGivenDate: string;
   supplier: string;
   amount: number;
@@ -157,10 +66,10 @@ export type Voucher = {
   status: "pending" | "active";
 };
 
-export default function page() {
+export default function Page() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
-  const [branchId, setBranchId] = useState<string | null>(null);
+  const [branchName, setBranchName] = useState<string>("");
   const [sorting, setSorting] = useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
   const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({
@@ -195,16 +104,28 @@ export default function page() {
       const parsed = JSON.parse(raw);
       const branchIdFromStorage =
         typeof parsed?._id === "string" ? parsed._id : null;
+      const branchNameFromStorage =
+        typeof parsed?.name === "string"
+          ? parsed.name
+          : typeof parsed?.branchName === "string"
+          ? parsed.branchName
+          : typeof parsed?.branch?.name === "string"
+          ? parsed.branch.name
+          : "";
 
       if (!branchIdFromStorage) return;
-      console.log("sdsdsd", branchIdFromStorage);
-      setBranchId(branchIdFromStorage);
+      if (branchNameFromStorage) setBranchName(branchNameFromStorage);
       try {
         const res = await fetch(`/api/voucherEntry/${branchIdFromStorage}`);
         if (!res.ok) throw new Error("Failed to fetch vouchers");
-        const vouchers = await res.json();
-        console.log("res", vouchers);
-        setData(vouchers);
+        const response = await res.json();
+
+        // Handle both old format (array) and new format (object with vouchers property)
+        if (Array.isArray(response)) {
+          setData(response);
+        } else {
+          setData(response.vouchers || []);
+        }
       } catch (err) {
         console.error(err);
       } finally {
@@ -221,62 +142,96 @@ export default function page() {
       header: () => <div className="text-xs">Paid</div>,
       cell: ({ row }) => {
         const isPaid = Boolean(row.original.voucherClearedDate);
-        return (
-          <Checkbox
-            checked={isPaid}
-            onCheckedChange={async (value) => {
-              const checked = Boolean(value);
-              const today = new Date().toISOString().slice(0, 10);
-              const newStatus: Voucher["status"] = checked
-                ? "active"
-                : "pending";
+        const handleStatusChange = async (checked: boolean) => {
+          const today = new Date().toISOString().slice(0, 10);
+          const newStatus: Voucher["status"] = checked ? "active" : "pending";
 
-              // Optimistic update
-              const previous = data;
-              const optimistic: Voucher[] = data.map((v) =>
-                v._id === row.original._id
-                  ? {
-                      ...v,
-                      voucherClearedDate: checked ? today : "",
-                      status: newStatus,
-                    }
-                  : v
-              );
-              setData(optimistic);
-
-              try {
-                const res = await fetch("/api/voucherEntry/paid", {
-                  method: "PATCH",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({
-                    voucherEntryId: row.original._id,
-                    voucherClearedDate: checked ? today : "",
-                    status: newStatus,
-                  }),
-                });
-
-                if (!res.ok) {
-                  const err = await res.json().catch(() => ({}));
-                  setData(previous);
-                  toast.error(err?.error || "Failed to update voucher status");
-                } else {
-                  const payload = await res.json().catch(() => null);
-                  if (payload?.voucher) {
-                    setData((prev) =>
-                      prev.map((v) =>
-                        v._id === row.original._id
-                          ? (payload.voucher as Voucher)
-                          : v
-                      )
-                    );
-                  }
+          // Optimistic update
+          const previous = data;
+          const optimistic: Voucher[] = data.map((v) =>
+            v._id === row.original._id
+              ? {
+                  ...v,
+                  chqCashIssuedDate: checked ? today : "",
+                  voucherClearedDate: checked ? today : "",
+                  status: newStatus,
                 }
-              } catch (e) {
-                setData(previous);
-                toast.error("Error updating voucher status");
+              : v
+          );
+          setData(optimistic);
+
+          try {
+            const res = await fetch("/api/voucherEntry/paid", {
+              method: "PATCH",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                voucherEntryId: row.original._id,
+                voucherClearedDate: checked ? today : "",
+                chqCashIssuedDate: checked ? today : "",
+                status: newStatus,
+              }),
+            });
+
+            if (!res.ok) {
+              const err = await res.json().catch(() => ({}));
+              setData(previous);
+              toast.error(err?.error || "Failed to update voucher status");
+            } else {
+              const payload = await res.json().catch(() => null);
+              if (payload?.voucher) {
+                setData((prev) => {
+                  const updated = prev.map((v) =>
+                    v._id === row.original._id
+                      ? (payload.voucher as Voucher)
+                      : v
+                  );
+
+                  return updated;
+                });
               }
-            }}
-            aria-label="Toggle paid"
+            }
+          } catch (e) {
+            setData(previous);
+            toast.error("Error updating voucher status");
+          }
+        };
+
+        return (
+          <ConfirmDialog
+            triggerLabel={
+              <div className="flex items-center justify-center">
+                <div
+                  className={`w-4 h-4 border-2 rounded flex items-center justify-center cursor-pointer transition-colors ${
+                    isPaid
+                      ? "bg-blue-600 border-blue-600 text-white"
+                      : "border-gray-300 hover:border-gray-400"
+                  }`}
+                >
+                  {isPaid && (
+                    <svg
+                      className="w-3 h-3"
+                      fill="currentColor"
+                      viewBox="0 0 20 20"
+                    >
+                      <path
+                        fillRule="evenodd"
+                        d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                        clipRule="evenodd"
+                      />
+                    </svg>
+                  )}
+                </div>
+              </div>
+            }
+            title={isPaid ? "MaLrk as Unpaid? ❌" : "Mark as Paid? ✅"}
+            description={
+              isPaid
+                ? `Are you sure you want to mark voucher #${row.original.voucherNo} as unpaid? This will clear the payment dates.`
+                : `Are you sure you want to mark voucher #${row.original.voucherNo} as paid? This will set today's date as the payment date.`
+            }
+            confirmLabel={isPaid ? "Mark Unpaid" : "Mark Paid"}
+            cancelLabel="Cancel"
+            onConfirm={() => handleStatusChange(!isPaid)}
           />
         );
       },
@@ -285,25 +240,32 @@ export default function page() {
     },
     {
       accessorKey: "voucherNo",
-      header: ({ column }) => {
-        return (
-          <Button
-            variant="ghost"
-            onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-          >
-            Voucher No
-            <ArrowUpDown className="ml-2 h-4 w-4" />
-          </Button>
-        );
-      },
+      header: "Voucher No",
       cell: ({ row }) => (
         <div className="font-mono font-medium text-blue-600">
           {row.getValue("voucherNo")}
         </div>
       ),
+      enableSorting: false,
     },
     {
-      accessorKey: "date",
+      accessorKey: "voucherBook",
+      header: "Voucher Book",
+      cell: ({ row }) => (
+        <div className="font-medium">{row.getValue("voucherBook")}</div>
+      ),
+      enableSorting: false,
+    },
+    {
+      accessorKey: "invoiceNo",
+      header: "Invoice No",
+      cell: ({ row }) => (
+        <div className="font-medium">{row.getValue("invoiceNo") || "-"}</div>
+      ),
+      enableSorting: false,
+    },
+    {
+      accessorKey: "createdAt",
       filterFn: (row, id, value: DateRange) => {
         if (!value || (!value.from && !value.to)) return true;
         return isWithinDateRange(row.getValue(id), value);
@@ -319,7 +281,11 @@ export default function page() {
           </Button>
         );
       },
-      cell: ({ row }) => <div>{row.getValue("date")}</div>,
+      cell: ({ row }) => {
+        const raw = row.getValue("createdAt") as string | undefined;
+        const display = raw ? String(raw).slice(0, 10) : "-";
+        return <div>{display}</div>;
+      },
     },
     {
       accessorKey: "voucherGivenDate",
@@ -338,24 +304,43 @@ export default function page() {
           </Button>
         );
       },
-      cell: ({ row }) => <div>{row.getValue("voucherGivenDate")}</div>,
+      cell: ({ row }) => {
+        const raw = row.getValue("voucherGivenDate") as string | undefined;
+        const display = raw ? String(raw).slice(0, 10) : "-";
+        return <div>{display}</div>;
+      },
     },
+
     {
       accessorKey: "supplier",
+      header: "Supplier",
+      cell: ({ row }) => (
+        <div className="font-medium">{row.getValue("supplier")}</div>
+      ),
+      enableSorting: false,
+    },
+    {
+      accessorKey: "amount",
       header: ({ column }) => {
         return (
           <Button
             variant="ghost"
             onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+            className="ml-auto"
           >
-            Supplier
+            Amount
             <ArrowUpDown className="ml-2 h-4 w-4" />
           </Button>
         );
       },
-      cell: ({ row }) => (
-        <div className="font-medium">{row.getValue("supplier")}</div>
-      ),
+      cell: ({ row }) => {
+        const amount = parseFloat(row.getValue("amount"));
+        const formatted = new Intl.NumberFormat("en-IN", {
+          style: "currency",
+          currency: "INR",
+        }).format(amount);
+        return <div className="text-right font-medium">{formatted}</div>;
+      },
     },
     {
       accessorKey: "status",
@@ -379,83 +364,82 @@ export default function page() {
           </span>
         );
       },
-    },
-    {
-      accessorKey: "amount",
-      header: () => <div className="text-right">Amount</div>,
-      cell: ({ row }) => {
-        const amount = parseFloat(row.getValue("amount"));
-        const formatted = new Intl.NumberFormat("en-US", {
-          style: "currency",
-          currency: "USD",
-        }).format(amount);
-        return <div className="text-right font-medium">{formatted}</div>;
-      },
+      enableSorting: false,
     },
     {
       accessorKey: "dues",
       header: () => <div className="text-right">Dues</div>,
       cell: ({ row }) => {
         const dues = parseFloat(row.getValue("dues"));
-        const formatted = new Intl.NumberFormat("en-US", {
+        const formatted = new Intl.NumberFormat("en-IN", {
           style: "currency",
-          currency: "USD",
+          currency: "INR",
         }).format(dues);
         return <div className="text-right">{formatted}</div>;
       },
+      enableSorting: false,
     },
     {
       accessorKey: "return",
       header: () => <div className="text-right">Return</div>,
       cell: ({ row }) => {
         const returnAmount = parseFloat(row.getValue("return"));
-        const formatted = new Intl.NumberFormat("en-US", {
+        const formatted = new Intl.NumberFormat("en-IN", {
           style: "currency",
-          currency: "USD",
+          currency: "INR",
         }).format(returnAmount);
         return <div className="text-right">{formatted}</div>;
       },
+      enableSorting: false,
     },
     {
       accessorKey: "discountAdvance",
       header: () => <div className="text-right">Discount/Advance</div>,
       cell: ({ row }) => {
         const discountAdvance = parseFloat(row.getValue("discountAdvance"));
-        const formatted = new Intl.NumberFormat("en-US", {
+        const formatted = new Intl.NumberFormat("en-IN", {
           style: "currency",
-          currency: "USD",
+          currency: "INR",
         }).format(discountAdvance);
         return <div className="text-right">{formatted}</div>;
       },
+      enableSorting: false,
     },
     {
       accessorKey: "netBalance",
       header: () => <div className="text-right">Net Balance</div>,
       cell: ({ row }) => {
         const netBalance = parseFloat(row.getValue("netBalance"));
-        const formatted = new Intl.NumberFormat("en-US", {
+        const formatted = new Intl.NumberFormat("en-IN", {
           style: "currency",
-          currency: "USD",
+          currency: "INR",
         }).format(netBalance);
         return <div className="text-right font-medium">{formatted}</div>;
       },
+      enableSorting: false,
     },
     {
       accessorKey: "chqCashIssuedDate",
       header: "CHQ/Cash Issued Date",
-      cell: ({ row }) => <div>{row.getValue("chqCashIssuedDate") || "-"}</div>,
+      cell: ({ row }) => {
+        const raw = row.getValue("chqCashIssuedDate") as string | undefined;
+        const display = raw ? String(raw).slice(0, 10) : "-";
+        return <div>{display}</div>;
+      },
+      enableSorting: false,
     },
     {
       accessorKey: "amountPaid",
       header: () => <div className="text-right">Amount Paid</div>,
       cell: ({ row }) => {
         const amountPaid = parseFloat(row.getValue("amountPaid"));
-        const formatted = new Intl.NumberFormat("en-US", {
+        const formatted = new Intl.NumberFormat("en-IN", {
           style: "currency",
-          currency: "USD",
+          currency: "INR",
         }).format(amountPaid);
         return <div className="text-right">{formatted}</div>;
       },
+      enableSorting: false,
     },
     {
       accessorKey: "voucherClearedDate",
@@ -463,7 +447,17 @@ export default function page() {
         if (!value || (!value.from && !value.to)) return true;
         return isWithinDateRange(row.getValue(id), value);
       },
-      header: "Voucher Cleared Date",
+      header: ({ column }) => {
+        return (
+          <Button
+            variant="ghost"
+            onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+          >
+            Voucher Cleared Date
+            <ArrowUpDown className="ml-2 h-4 w-4" />
+          </Button>
+        );
+      },
       cell: ({ row }) => {
         const raw = row.getValue("voucherClearedDate") as string | undefined;
         const display = raw ? String(raw).slice(0, 10) : "-";
@@ -490,10 +484,12 @@ export default function page() {
           </HoverCardContent>
         </HoverCard>
       ),
+      enableSorting: false,
     },
     {
       id: "actions",
       enableHiding: false,
+      enableSorting: false,
       cell: ({ row }) => {
         const voucher = row.original;
 
@@ -510,7 +506,6 @@ export default function page() {
               <Edit className="h-4 w-4" />
               <span className="sr-only">Edit voucher</span>
             </Button>
-      
           </div>
         );
       },
@@ -534,484 +529,579 @@ export default function page() {
     },
   });
 
-  // Calculate totals
-  const grandTotalAmount = data.reduce(
-    (sum, voucher) => sum + voucher.amount,
-    0
-  );
-  const grandTotalNetBalance = data.reduce(
-    (sum, voucher) => sum + voucher.netBalance,
-    0
-  );
+  // Calculate totals for filtered data (for display purposes)
+  const filteredGrandTotalAmount = table
+    .getFilteredRowModel()
+    .rows.reduce((sum, row) => sum + row.original.amount, 0);
+
+  const escapeForCsv = (value: unknown) => {
+    const asString = value === null || value === undefined ? "" : String(value);
+    if (/[",\n]/.test(asString)) {
+      return '"' + asString.replace(/"/g, '""') + '"';
+    }
+    return asString;
+  };
+
+  const vouchersToCsv = (rows: Voucher[]) => {
+    const headers = [
+      "Voucher No",
+      "Invoice No",
+      "Date",
+      "Voucher Given Date",
+      "Supplier",
+      "Status",
+      "Amount",
+      "Dues",
+      "Return",
+      "Discount/Advance",
+      "Net Balance",
+      "CHQ/Cash Issued Date",
+      "Amount Paid",
+      "Voucher Cleared Date",
+      "Remarks",
+    ];
+
+    // Wrap dates so Excel treats them as text and avoids ####### when columns are narrow
+    const formatDate = (d?: string) => {
+      const s = d ? String(d).slice(0, 10) : "";
+      return s ? `="${s}"` : "";
+    };
+
+    const lines = rows.map((v) => [
+      v.voucherNo,
+      v.invoiceNo || "",
+      formatDate(v.createdAt),
+      formatDate(v.voucherGivenDate),
+      v.supplier,
+      v.status === "active" ? "Paid" : "Unpaid",
+      v.amount,
+      v.dues,
+      v.return,
+      v.discountAdvance,
+      v.netBalance,
+      formatDate(v.chqCashIssuedDate),
+      v.amountPaid,
+      formatDate(v.voucherClearedDate),
+      v.remarks,
+    ]);
+
+    const csv = [headers, ...lines]
+      .map((row) => row.map(escapeForCsv).join(","))
+      .join("\n");
+
+    return csv;
+  };
+
+  const downloadCsv = (csv: string, filename: string) => {
+    const blob = new Blob(["\uFEFF" + csv], {
+      type: "text/csv;charset=utf-8;",
+    });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
+  const handleExportCsv = () => {
+    const filteredRows = table
+      .getFilteredRowModel()
+      .rows.map((r) => r.original);
+    const useFiltered =
+      filteredRows.length > 0 && filteredRows.length < data.length;
+    const rows = useFiltered ? filteredRows : data;
+    const csv = vouchersToCsv(rows);
+    const suffix = useFiltered ? "filtered" : "all";
+    const today = new Date().toISOString().slice(0, 10);
+    const safeBranch = (branchName || "branch").replace(/[^a-z0-9-_]+/gi, "-");
+    downloadCsv(csv, `vouchers_${safeBranch}_${today}_${suffix}.csv`);
+  };
 
   return (
-    <div className="w-full min-h-screen bg-gray-50 p-4">
+    <>
       <Navbar />
-      {/* Header */}
-      <div className="mb-4">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-3">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">
-              Voucher Dashboard
-            </h1>
-            <p className="text-xs text-gray-500 mt-1">
-              Track and manage vouchers by status and dates
-            </p>
+      <div className="w-full min-h-screen bg-gray-50 p-4">
+        {/* Header */}
+        <div className="mb-4">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-3 mt-4">
+            <div>
+              <h1 className="text-2xl font-bold text-gray-900">
+                Voucher Dashboard
+              </h1>
+              <p className="text-xs text-gray-500 mt-1">
+                Track and manage vouchers by status and dates
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                size="sm"
+                className="text-xs"
+                onClick={() => router.push("/branch/createVoucherEntry")}
+              >
+                Create Voucher
+              </Button>
+              <SupplierDialog />
+              <VoucherBookDialog />
+              <Button
+                size="sm"
+                variant="outline"
+                className="text-xs"
+                onClick={handleExportCsv}
+              >
+                Export (CSV)
+              </Button>
+            </div>
           </div>
-          <div className="flex items-center gap-2">
-            <Button
-              size="sm"
-              className="text-xs"
-              onClick={() => router.push("/branch/createVoucherEntry")}
-            >
-              Create Voucher
-            </Button>
-            <SupplierDialog />
+
+          {/* KPI Cards */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <Card>
+              <CardContent className="p-3">
+                <div className="text-xs text-gray-500">Total Vouchers</div>
+                <div className="text-xl font-semibold text-gray-900">
+                  {table.getFilteredRowModel().rows.length}
+                </div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="p-3">
+                <div className="text-xs text-gray-500">Grand Total Amount</div>
+                <div className="text-lg font-bold text-blue-700">
+                  {new Intl.NumberFormat("en-IN", {
+                    style: "currency",
+                    currency: "INR",
+                  }).format(filteredGrandTotalAmount)}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Filters */}
+          <div className="mt-4 rounded-md border bg-white">
+            <div className="p-3">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
+                <div className="flex flex-col sm:flex-row gap-3 w-full">
+                  <div className="flex items-center gap-2 text-xs">
+                    <span className="whitespace-nowrap">Date:</span>
+                    <input
+                      type="date"
+                      value={issueDateRange.from ?? ""}
+                      onChange={(e) => {
+                        const next = {
+                          ...issueDateRange,
+                          from: e.target.value || undefined,
+                        };
+                        setIssueDateRange(next);
+                        table.getColumn("createdAt")?.setFilterValue(next);
+                      }}
+                      className="px-2 py-1 border border-gray-300 rounded"
+                    />
+                    <span>to</span>
+                    <input
+                      type="date"
+                      value={issueDateRange.to ?? ""}
+                      onChange={(e) => {
+                        const next = {
+                          ...issueDateRange,
+                          to: e.target.value || undefined,
+                        };
+                        setIssueDateRange(next);
+                        table.getColumn("createdAt")?.setFilterValue(next);
+                      }}
+                      className="px-2 py-1 border border-gray-300 rounded"
+                    />
+                  </div>
+                  <div className="flex items-center gap-2 text-xs">
+                    <span className="whitespace-nowrap">Voucher Given:</span>
+                    <input
+                      type="date"
+                      value={givenDateRange.from ?? ""}
+                      onChange={(e) => {
+                        const next = {
+                          ...givenDateRange,
+                          from: e.target.value || undefined,
+                        };
+                        setGivenDateRange(next);
+                        table
+                          .getColumn("voucherGivenDate")
+                          ?.setFilterValue(next);
+                      }}
+                      className="px-2 py-1 border border-gray-300 rounded"
+                    />
+                    <span>to</span>
+                    <input
+                      type="date"
+                      value={givenDateRange.to ?? ""}
+                      onChange={(e) => {
+                        const next = {
+                          ...givenDateRange,
+                          to: e.target.value || undefined,
+                        };
+                        setGivenDateRange(next);
+                        table
+                          .getColumn("voucherGivenDate")
+                          ?.setFilterValue(next);
+                      }}
+                      className="px-2 py-1 border border-gray-300 rounded"
+                    />
+                  </div>
+                  <div className="flex items-center gap-2 text-xs">
+                    <span className="whitespace-nowrap">Cleared:</span>
+                    <input
+                      type="date"
+                      value={clearedDateRange.from ?? ""}
+                      onChange={(e) => {
+                        const next = {
+                          ...clearedDateRange,
+                          from: e.target.value || undefined,
+                        };
+                        setClearedDateRange(next);
+                        table
+                          .getColumn("voucherClearedDate")
+                          ?.setFilterValue(next);
+                      }}
+                      className="px-2 py-1 border border-gray-300 rounded"
+                    />
+                    <span>to</span>
+                    <input
+                      type="date"
+                      value={clearedDateRange.to ?? ""}
+                      onChange={(e) => {
+                        const next = {
+                          ...clearedDateRange,
+                          to: e.target.value || undefined,
+                        };
+                        setClearedDateRange(next);
+                        table
+                          .getColumn("voucherClearedDate")
+                          ?.setFilterValue(next);
+                      }}
+                      className="px-2 py-1 border border-gray-300 rounded"
+                    />
+                  </div>
+                  <div className="flex items-center gap-2 text-xs">
+                    <span className="whitespace-nowrap">Paid:</span>
+                    <select
+                      value={
+                        (table
+                          .getColumn("status")
+                          ?.getFilterValue() as string) ?? ""
+                      }
+                      onChange={(e) =>
+                        table
+                          .getColumn("status")
+                          ?.setFilterValue(e.target.value || undefined)
+                      }
+                      className="px-2 py-1 border border-gray-300 rounded text-xs"
+                    >
+                      <option value="">All</option>
+                      <option value="active">Paid</option>
+                      <option value="pending">Unpaid</option>
+                    </select>
+                  </div>
+                  <div className="flex items-center gap-2 ml-auto">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="text-xs"
+                      onClick={() => {
+                        setIssueDateRange({});
+                        setGivenDateRange({});
+                        setClearedDateRange({});
+                        table.getColumn("createdAt")?.setFilterValue(undefined);
+                        table
+                          .getColumn("voucherGivenDate")
+                          ?.setFilterValue(undefined);
+                        table
+                          .getColumn("voucherClearedDate")
+                          ?.setFilterValue(undefined);
+                        table.getColumn("voucherNo")?.setFilterValue("");
+                        table.getColumn("status")?.setFilterValue(undefined);
+                      }}
+                    >
+                      Reset Filters
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
 
-        {/* KPI Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          <Card>
-            <CardContent className="p-3">
-              <div className="text-xs text-gray-500">Total Vouchers</div>
-              <div className="text-xl font-semibold text-gray-900">
-                {data.length}
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-3">
-              <div className="text-xs text-gray-500">Grand Total Amount</div>
-              <div className="text-lg font-bold text-blue-700">
-                {new Intl.NumberFormat("en-US", {
-                  style: "currency",
-                  currency: "USD",
-                }).format(grandTotalAmount)}
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-3">
-              <div className="text-xs text-gray-500">
-                Grand Total Net Balance
-              </div>
-              <div className="text-lg font-bold text-blue-700">
-                {new Intl.NumberFormat("en-US", {
-                  style: "currency",
-                  currency: "USD",
-                }).format(grandTotalNetBalance)}
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Filters */}
+        {/* Search */}
         <div className="mt-4 rounded-md border bg-white">
           <div className="p-3">
             <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
-              <Input
-                placeholder="Search by supplier..."
-                value={
-                  (table.getColumn("supplier")?.getFilterValue() as string) ??
-                  ""
-                }
-                onChange={(event) =>
-                  table
-                    .getColumn("supplier")
-                    ?.setFilterValue(event.target.value)
-                }
-                className="max-w-xs text-sm"
-              />
-              <div className="flex flex-col sm:flex-row gap-3 w-full">
-                <div className="flex items-center gap-2 text-xs">
-                  <span className="whitespace-nowrap">Date:</span>
-                  <input
-                    type="date"
-                    value={issueDateRange.from ?? ""}
-                    onChange={(e) => {
-                      const next = {
-                        ...issueDateRange,
-                        from: e.target.value || undefined,
-                      };
-                      setIssueDateRange(next);
-                      table.getColumn("date")?.setFilterValue(next);
-                    }}
-                    className="px-2 py-1 border border-gray-300 rounded"
-                  />
-                  <span>to</span>
-                  <input
-                    type="date"
-                    value={issueDateRange.to ?? ""}
-                    onChange={(e) => {
-                      const next = {
-                        ...issueDateRange,
-                        to: e.target.value || undefined,
-                      };
-                      setIssueDateRange(next);
-                      table.getColumn("date")?.setFilterValue(next);
-                    }}
-                    className="px-2 py-1 border border-gray-300 rounded"
-                  />
-                </div>
-                <div className="flex items-center gap-2 text-xs">
-                  <span className="whitespace-nowrap">Voucher Given:</span>
-                  <input
-                    type="date"
-                    value={givenDateRange.from ?? ""}
-                    onChange={(e) => {
-                      const next = {
-                        ...givenDateRange,
-                        from: e.target.value || undefined,
-                      };
-                      setGivenDateRange(next);
-                      table.getColumn("voucherGivenDate")?.setFilterValue(next);
-                    }}
-                    className="px-2 py-1 border border-gray-300 rounded"
-                  />
-                  <span>to</span>
-                  <input
-                    type="date"
-                    value={givenDateRange.to ?? ""}
-                    onChange={(e) => {
-                      const next = {
-                        ...givenDateRange,
-                        to: e.target.value || undefined,
-                      };
-                      setGivenDateRange(next);
-                      table.getColumn("voucherGivenDate")?.setFilterValue(next);
-                    }}
-                    className="px-2 py-1 border border-gray-300 rounded"
-                  />
-                </div>
-                <div className="flex items-center gap-2 text-xs">
-                  <span className="whitespace-nowrap">Cleared:</span>
-                  <input
-                    type="date"
-                    value={clearedDateRange.from ?? ""}
-                    onChange={(e) => {
-                      const next = {
-                        ...clearedDateRange,
-                        from: e.target.value || undefined,
-                      };
-                      setClearedDateRange(next);
-                      table
-                        .getColumn("voucherClearedDate")
-                        ?.setFilterValue(next);
-                    }}
-                    className="px-2 py-1 border border-gray-300 rounded"
-                  />
-                  <span>to</span>
-                  <input
-                    type="date"
-                    value={clearedDateRange.to ?? ""}
-                    onChange={(e) => {
-                      const next = {
-                        ...clearedDateRange,
-                        to: e.target.value || undefined,
-                      };
-                      setClearedDateRange(next);
-                      table
-                        .getColumn("voucherClearedDate")
-                        ?.setFilterValue(next);
-                    }}
-                    className="px-2 py-1 border border-gray-300 rounded"
-                  />
-                </div>
-                <div className="flex items-center gap-2 text-xs">
-                  <span className="whitespace-nowrap">Paid:</span>
-                  <select
-                    value={
-                      (table.getColumn("status")?.getFilterValue() as string) ??
-                      ""
-                    }
-                    onChange={(e) =>
-                      table
-                        .getColumn("status")
-                        ?.setFilterValue(e.target.value || undefined)
-                    }
-                    className="px-2 py-1 border border-gray-300 rounded text-xs"
-                  >
-                    <option value="">All</option>
-                    <option value="active">Paid</option>
-                    <option value="pending">Unpaid</option>
-                  </select>
-                </div>
-                <div className="flex items-center gap-2 ml-auto">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="text-xs"
-                    onClick={() => {
-                      setIssueDateRange({});
-                      setGivenDateRange({});
-                      setClearedDateRange({});
-                      table.getColumn("date")?.setFilterValue(undefined);
-                      table
-                        .getColumn("voucherGivenDate")
-                        ?.setFilterValue(undefined);
-                      table
-                        .getColumn("voucherClearedDate")
-                        ?.setFilterValue(undefined);
-                      table.getColumn("supplier")?.setFilterValue("");
-                      table.getColumn("status")?.setFilterValue(undefined);
-                    }}
-                  >
-                    Reset Filters
-                  </Button>
-                </div>
+              <div className="flex gap-2 w-full">
+                <Input
+                  placeholder="Search by voucher number..."
+                  value={
+                    (table
+                      .getColumn("voucherNo")
+                      ?.getFilterValue() as string) ?? ""
+                  }
+                  onChange={(event) =>
+                    table
+                      .getColumn("voucherNo")
+                      ?.setFilterValue(event.target.value)
+                  }
+                  className="max-w-md text-sm"
+                />
               </div>
             </div>
           </div>
         </div>
-      </div>
 
-      {/* Columns control outside the filters box */}
-      <div className="flex justify-end items-center mb-2">
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="outline" size="sm" className="text-xs">
-              Columns <ChevronDown className="w-3 h-3" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            {table
-              .getAllColumns()
-              .filter((column) => column.getCanHide())
-              .map((column) => {
-                return (
-                  <DropdownMenuCheckboxItem
-                    key={column.id}
-                    className="capitalize text-xs"
-                    checked={column.getIsVisible()}
-                    onCheckedChange={(value) =>
-                      column.toggleVisibility(!!value)
-                    }
-                  >
-                    {column.id}
-                  </DropdownMenuCheckboxItem>
-                );
-              })}
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </div>
+        {/* Columns control outside the filters box */}
+        <div className="flex justify-end items-center mb-2">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm" className="text-xs">
+                Columns <ChevronDown className="w-3 h-3" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              {table
+                .getAllColumns()
+                .filter((column) => column.getCanHide())
+                .map((column) => {
+                  return (
+                    <DropdownMenuCheckboxItem
+                      key={column.id}
+                      className="capitalize text-xs"
+                      checked={column.getIsVisible()}
+                      onCheckedChange={(value) =>
+                        column.toggleVisibility(!!value)
+                      }
+                    >
+                      {column.id}
+                    </DropdownMenuCheckboxItem>
+                  );
+                })}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
 
-      {/* Voucher Table */}
-      <div className="overflow-x-auto rounded-md border bg-white">
-        <div className="min-w-full">
-          <Table>
-            <TableHeader className="sticky top-0 z-10 bg-white">
-              {table.getHeaderGroups().map((headerGroup) => (
-                <TableRow key={headerGroup.id}>
-                  {headerGroup.headers.map((header) => {
-                    return (
-                      <TableHead key={header.id} className="text-sm p-3">
-                        {header.isPlaceholder
-                          ? null
-                          : flexRender(
-                              header.column.columnDef.header,
-                              header.getContext()
-                            )}
-                      </TableHead>
-                    );
-                  })}
-                </TableRow>
-              ))}
-            </TableHeader>
-            <TableBody>
-              {table.getRowModel().rows?.length ? (
-                table.getRowModel().rows.map((row) => (
-                  <TableRow
-                    key={row.id}
-                    // className={
-                    //   row.original.status === "cleared" ? "bg-green-50" : ""
-                    // }
-                  >
-                    {row.getVisibleCells().map((cell) => (
-                      <TableCell key={cell.id} className="text-sm p-3">
-                        {flexRender(
-                          cell.column.columnDef.cell,
-                          cell.getContext()
-                        )}
-                      </TableCell>
-                    ))}
+        {/* Voucher Table */}
+        <div className="overflow-x-auto rounded-md border bg-white">
+          <div className="min-w-full">
+            <Table>
+              <TableHeader className="sticky top-0 z-10 bg-white">
+                {table.getHeaderGroups().map((headerGroup) => (
+                  <TableRow key={headerGroup.id}>
+                    {headerGroup.headers.map((header) => {
+                      return (
+                        <TableHead key={header.id} className="text-base p-4">
+                          {header.isPlaceholder
+                            ? null
+                            : flexRender(
+                                header.column.columnDef.header,
+                                header.getContext()
+                              )}
+                        </TableHead>
+                      );
+                    })}
                   </TableRow>
-                ))
-              ) : (
-                <TableRow>
-                  <TableCell
-                    colSpan={columns.length}
-                    className="h-24 text-center text-sm text-gray-500"
-                  >
-                    {loading
-                      ? "Loading vouchers..."
-                      : "No results. Adjust filters to see more."}
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
-        </div>
-      </div>
-
-      {/* Pagination and Row Selection */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 py-3">
-        <div className="text-muted-foreground text-xs">
-          {table.getFilteredSelectedRowModel().rows.length} of{" "}
-          {table.getFilteredRowModel().rows.length} row(s) selected.
-        </div>
-
-        {/* Page Size Selection */}
-        <div className="flex items-center gap-2 text-xs">
-          <span>Rows per page:</span>
-          <select
-            value={table.getState().pagination.pageSize}
-            onChange={(e) => {
-              table.setPageSize(Number(e.target.value));
-            }}
-            className="px-2 py-1 border border-gray-300 rounded text-xs"
-          >
-            {[10, 20, 30, 40, 50].map((pageSize) => (
-              <option key={pageSize} value={pageSize}>
-                {pageSize}
-              </option>
-            ))}
-          </select>
+                ))}
+              </TableHeader>
+              <TableBody>
+                {table.getRowModel().rows?.length ? (
+                  table.getRowModel().rows.map((row) => (
+                    <TableRow
+                      key={row.id}
+                      className={
+                        row.original.status === "active" ? "bg-green-50" : ""
+                      }
+                    >
+                      {row.getVisibleCells().map((cell) => (
+                        <TableCell key={cell.id} className="text-base p-4">
+                          {flexRender(
+                            cell.column.columnDef.cell,
+                            cell.getContext()
+                          )}
+                        </TableCell>
+                      ))}
+                    </TableRow>
+                  ))
+                ) : (
+                  <TableRow>
+                    <TableCell
+                      colSpan={columns.length}
+                      className="h-24 text-center text-sm text-gray-500"
+                    >
+                      {loading
+                        ? "Loading vouchers..."
+                        : "No results. Adjust filters to see more."}
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </div>
         </div>
 
-        {/* Pagination Controls */}
-        <div className="flex items-center gap-2">
-          <div className="flex items-center gap-1 text-xs text-gray-600">
-            <span>Page</span>
-            <strong>
-              {table.getState().pagination.pageIndex + 1} of{" "}
-              {table.getPageCount()}
-            </strong>
+        {/* Pagination and Row Selection */}
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 py-3">
+          <div className="text-muted-foreground text-xs">
+            {table.getFilteredSelectedRowModel().rows.length} of{" "}
+            {table.getFilteredRowModel().rows.length} row(s) selected.
           </div>
 
-          <div className="flex gap-1">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => table.setPageIndex(0)}
-              disabled={!table.getCanPreviousPage()}
-              className="text-xs px-2 py-1 h-8"
+          {/* Page Size Selection */}
+          <div className="flex items-center gap-2 text-xs">
+            <span>Rows per page:</span>
+            <select
+              value={table.getState().pagination.pageSize}
+              onChange={(e) => {
+                table.setPageSize(Number(e.target.value));
+              }}
+              className="px-2 py-1 border border-gray-300 rounded text-xs"
             >
-              {"<<"}
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => table.previousPage()}
-              disabled={!table.getCanPreviousPage()}
-              className="text-xs px-3 py-1 h-8"
-            >
-              Previous
-            </Button>
+              {[10, 20, 30, 40, 50].map((pageSize) => (
+                <option key={pageSize} value={pageSize}>
+                  {pageSize}
+                </option>
+              ))}
+            </select>
+          </div>
 
-            {/* Page Numbers */}
-            <div className="flex items-center gap-1">
-              {(() => {
-                const pageCount = table.getPageCount();
-                const currentPage = table.getState().pagination.pageIndex;
-                const pages = [];
+          {/* Pagination Controls */}
+          <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1 text-xs text-gray-600">
+              <span>Page</span>
+              <strong>
+                {table.getState().pagination.pageIndex + 1} of{" "}
+                {table.getPageCount()}
+              </strong>
+            </div>
 
-                // Show first page
-                if (pageCount > 0) {
-                  pages.push(
-                    <Button
-                      key={0}
-                      variant={currentPage === 0 ? "default" : "outline"}
-                      size="sm"
-                      onClick={() => table.setPageIndex(0)}
-                      className="text-xs px-2 py-1 h-8 w-8"
-                    >
-                      1
-                    </Button>
-                  );
-                }
+            <div className="flex gap-1">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => table.setPageIndex(0)}
+                disabled={!table.getCanPreviousPage()}
+                className="text-xs px-2 py-1 h-8"
+              >
+                {"<<"}
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => table.previousPage()}
+                disabled={!table.getCanPreviousPage()}
+                className="text-xs px-3 py-1 h-8"
+              >
+                Previous
+              </Button>
 
-                // Show ellipsis if needed
-                if (currentPage > 3) {
-                  pages.push(
-                    <span key="ellipsis1" className="px-2 text-gray-400">
-                      ...
-                    </span>
-                  );
-                }
+              {/* Page Numbers */}
+              <div className="flex items-center gap-1">
+                {(() => {
+                  const pageCount = table.getPageCount();
+                  const currentPage = table.getState().pagination.pageIndex;
+                  const pages = [];
 
-                // Show pages around current page
-                for (
-                  let i = Math.max(1, currentPage - 1);
-                  i <= Math.min(pageCount - 2, currentPage + 1);
-                  i++
-                ) {
-                  if (i > 0 && i < pageCount - 1) {
+                  // Show first page
+                  if (pageCount > 0) {
                     pages.push(
                       <Button
-                        key={i}
-                        variant={currentPage === i ? "default" : "outline"}
+                        key={0}
+                        variant={currentPage === 0 ? "default" : "outline"}
                         size="sm"
-                        onClick={() => table.setPageIndex(i)}
+                        onClick={() => table.setPageIndex(0)}
                         className="text-xs px-2 py-1 h-8 w-8"
                       >
-                        {i + 1}
+                        1
                       </Button>
                     );
                   }
-                }
 
-                // Show ellipsis if needed
-                if (currentPage < pageCount - 4) {
-                  pages.push(
-                    <span key="ellipsis2" className="px-2 text-gray-400">
-                      ...
-                    </span>
-                  );
-                }
+                  // Show ellipsis if needed
+                  if (currentPage > 3) {
+                    pages.push(
+                      <span key="ellipsis1" className="px-2 text-gray-400">
+                        ...
+                      </span>
+                    );
+                  }
 
-                // Show last page
-                if (pageCount > 1) {
-                  pages.push(
-                    <Button
-                      key={pageCount - 1}
-                      variant={
-                        currentPage === pageCount - 1 ? "default" : "outline"
-                      }
-                      size="sm"
-                      onClick={() => table.setPageIndex(pageCount - 1)}
-                      className="text-xs px-2 py-1 h-8 w-8"
-                    >
-                      {pageCount}
-                    </Button>
-                  );
-                }
+                  // Show pages around current page
+                  for (
+                    let i = Math.max(1, currentPage - 1);
+                    i <= Math.min(pageCount - 2, currentPage + 1);
+                    i++
+                  ) {
+                    if (i > 0 && i < pageCount - 1) {
+                      pages.push(
+                        <Button
+                          key={i}
+                          variant={currentPage === i ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => table.setPageIndex(i)}
+                          className="text-xs px-2 py-1 h-8 w-8"
+                        >
+                          {i + 1}
+                        </Button>
+                      );
+                    }
+                  }
 
-                return pages;
-              })()}
+                  // Show ellipsis if needed
+                  if (currentPage < pageCount - 4) {
+                    pages.push(
+                      <span key="ellipsis2" className="px-2 text-gray-400">
+                        ...
+                      </span>
+                    );
+                  }
+
+                  // Show last page
+                  if (pageCount > 1) {
+                    pages.push(
+                      <Button
+                        key={pageCount - 1}
+                        variant={
+                          currentPage === pageCount - 1 ? "default" : "outline"
+                        }
+                        size="sm"
+                        onClick={() => table.setPageIndex(pageCount - 1)}
+                        className="text-xs px-2 py-1 h-8 w-8"
+                      >
+                        {pageCount}
+                      </Button>
+                    );
+                  }
+
+                  return pages;
+                })()}
+              </div>
+
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => table.nextPage()}
+                disabled={!table.getCanNextPage()}
+                className="text-xs px-3 py-1 h-8"
+              >
+                Next
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => table.setPageIndex(table.getPageCount() - 1)}
+                disabled={!table.getCanNextPage()}
+                className="text-xs px-2 py-1 h-8"
+              >
+                {">>"}
+              </Button>
             </div>
-
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => table.nextPage()}
-              disabled={!table.getCanNextPage()}
-              className="text-xs px-3 py-1 h-8"
-            >
-              Next
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => table.setPageIndex(table.getPageCount() - 1)}
-              disabled={!table.getCanNextPage()}
-              className="text-xs px-2 py-1 h-8"
-            >
-              {">>"}
-            </Button>
           </div>
         </div>
       </div>
-    </div>
+    </>
   );
 }

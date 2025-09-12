@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-import bcrypt from "bcryptjs";
 import connectDb from "@/lib/mongodb";
 import Branch from "@/model/branch";
 
@@ -55,26 +54,114 @@ export async function GET() {
 
 export async function PATCH(req: Request) {
   try {
-    const { branchId, newSupplierName } = await req.json();
+    const body = await req.json();
+    const { branchId, newSupplierName } = body ?? {};
     await connectDb();
-    console.log("banr", branchId, newSupplierName);
-    // Check if branch username already exists
     const existingBranch = await Branch.findById(branchId);
-    console.log("sdsdsd", existingBranch.Supplier);
-    if (existingBranch.Supplier.includes(newSupplierName)) {
+    if (!existingBranch) {
+      return NextResponse.json({ error: "Branch not found" }, { status: 404 });
+    }
+
+    // Supplier add (existing behavior)
+    if (typeof newSupplierName === "string" && newSupplierName.trim().length) {
+      if (existingBranch.Supplier.includes(newSupplierName)) {
+        return NextResponse.json(
+          { error: "supplier already exists" },
+          { status: 400 }
+        );
+      }
+      existingBranch.Supplier.push(newSupplierName);
+      await existingBranch.save();
+      return NextResponse.json({ message: "Supplier added" }, { status: 201 });
+    }
+
+    // Voucher book CRUD
+    const { action, voucherIndex, name, start, end } = body ?? {};
+    if (action === "addVoucher") {
+      if (!name || start == null || end == null) {
+        return NextResponse.json(
+          { error: "name, start, end are required" },
+          { status: 400 }
+        );
+      }
+      if (existingBranch.vouchers.some((v: any) => v.name === name)) {
+        return NextResponse.json(
+          { error: "Voucher book name already exists" },
+          { status: 400 }
+        );
+      }
+      existingBranch.vouchers.push({
+        name,
+        start: Number(start),
+        end: Number(end),
+        usedVouchers: [],
+      });
+      await existingBranch.save();
       return NextResponse.json(
-        { error: "supplier already exists" },
-        { status: 400 }
+        { message: "Voucher book added" },
+        { status: 201 }
       );
     }
 
-    existingBranch.Supplier.push(newSupplierName);
+    if (action === "editVoucher") {
+      if (voucherIndex == null) {
+        return NextResponse.json(
+          { error: "voucherIndex is required" },
+          { status: 400 }
+        );
+      }
+      const vb = existingBranch.vouchers[voucherIndex];
+      if (!vb) {
+        return NextResponse.json(
+          { error: "Voucher book not found" },
+          { status: 404 }
+        );
+      }
+      if (typeof name === "string" && name.trim().length) {
+        const duplicate = existingBranch.vouchers.some(
+          (v: any, i: number) => i !== voucherIndex && v.name === name
+        );
+        if (duplicate) {
+          return NextResponse.json(
+            { error: "Voucher book name already exists" },
+            { status: 400 }
+          );
+        }
+        vb.name = name;
+      }
+      if (start != null) vb.start = Number(start);
+      if (end != null) vb.end = Number(end);
+      await existingBranch.save();
+      return NextResponse.json(
+        { message: "Voucher book updated" },
+        { status: 200 }
+      );
+    }
 
-    await existingBranch.save();
+    if (action === "deleteVoucher") {
+      if (voucherIndex == null) {
+        return NextResponse.json(
+          { error: "voucherIndex is required" },
+          { status: 400 }
+        );
+      }
+      if (!existingBranch.vouchers[voucherIndex]) {
+        return NextResponse.json(
+          { error: "Voucher book not found" },
+          { status: 404 }
+        );
+      }
+      existingBranch.vouchers.splice(voucherIndex, 1);
+      await existingBranch.save();
+      return NextResponse.json(
+        { message: "Voucher book deleted" },
+        { status: 200 }
+      );
+    }
 
     return NextResponse.json(
-      { message: "Branch created successfully" },
-      { status: 201 }
+      { error: "No valid action specified" },
+      { status: 400 }
     );
   } catch (error) {
     console.error("Error creating branch:", error);

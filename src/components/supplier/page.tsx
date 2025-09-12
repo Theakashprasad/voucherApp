@@ -4,17 +4,26 @@ import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
-  DialogClose,
   DialogContent,
   DialogDescription,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Plus } from "lucide-react";
-import { toast } from "sonner";
+import { toast, Toaster } from "sonner";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 export function SupplierDialog() {
   const [suppliers, setSuppliers] = useState<string[]>([]);
@@ -27,9 +36,7 @@ export function SupplierDialog() {
   useEffect(() => {
     // Get branch ID from localStorage
     try {
-      console.log("sd");
       async function getData() {
-        console.log("sd");
         const raw = localStorage.getItem("branchDetails");
         if (!raw) return;
         const parsed = JSON.parse(raw);
@@ -43,7 +50,6 @@ export function SupplierDialog() {
         const res = await fetch(`/api/branch/${branchIdFromStorage}`);
         if (res.ok) {
           const branchData = await res.json();
-          // console.log("Branch data from API:", );
           setSuppliers(
             Array.isArray(branchData.Supplier) ? branchData.Supplier : []
           );
@@ -82,12 +88,13 @@ export function SupplierDialog() {
       });
 
       if (res.ok) {
+        const supplierName = suppliers[index];
         setSuppliers((previousSuppliers) =>
           previousSuppliers.filter((_, i) => i !== index)
         );
         setEditingIndex(null);
         setCreatingIndex(null);
-        toast.success("Supplier deleted.");
+        toast.success(`Supplier "${supplierName}" deleted successfully!`);
       } else {
         const data = await res.json().catch(() => ({}));
         toast.error(
@@ -207,6 +214,8 @@ export function SupplierDialog() {
 
   return (
     <Dialog>
+      <Toaster position="top-right" expand={true} />
+
       <DialogTrigger asChild>
         <Button variant="outline">Suppliers</Button>
       </DialogTrigger>
@@ -259,13 +268,32 @@ export function SupplierDialog() {
                     Edit
                   </Button>
                 )}
-                <Button
-                  size="sm"
-                  variant="destructive"
-                  onClick={() => handleDelete(index)}
-                >
-                  Delete
-                </Button>
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button size="sm" variant="destructive">
+                      Delete
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        This action cannot be undone. This will permanently
+                        delete the supplier "{supplier}".
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                      <AlertDialogAction
+                        onClick={() => handleDelete(index)}
+                        className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                        disabled={loading}
+                      >
+                        {loading ? "Deleting..." : "Delete"}
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
               </div>
             </div>
           ))}

@@ -10,6 +10,7 @@ export async function PATCH(req: Request) {
     const voucherEntryId = String(body?.voucherEntryId || "").trim();
     const voucherClearedDate = body?.voucherClearedDate as string | undefined;
     const rawStatus = body?.status as string | undefined;
+    const chqCashIssuedDate = body?.chqCashIssuedDate as string | undefined;
     const normalizedStatus =
       typeof rawStatus === "string"
         ? rawStatus.trim().toLowerCase()
@@ -40,6 +41,18 @@ export async function PATCH(req: Request) {
       } else {
         // Unset when empty string provided
         (update as any).$unset = { voucherClearedDate: "" };
+      }
+    }
+
+    // Handle set/unset chqCashIssuedDate in tandem
+    if (typeof chqCashIssuedDate === "string") {
+      if (chqCashIssuedDate.trim().length > 0) {
+        (update as any).chqCashIssuedDate = new Date(chqCashIssuedDate);
+      } else {
+        (update as any).$unset = {
+          ...(update as any).$unset,
+          chqCashIssuedDate: "",
+        };
       }
     }
 

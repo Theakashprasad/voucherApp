@@ -24,7 +24,6 @@ import {
   Dialog,
   DialogClose,
   DialogContent,
-  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -32,6 +31,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import Image from "next/image";
 
 // Menu items.
 const Icons = {
@@ -106,7 +106,7 @@ export function DashboardSidebar() {
                   type="button"
                   className="flex items-center gap-3 w-full text-left"
                 >
-                  <img
+                  <Image
                     src="/profile.png"
                     className="h-7 w-7 flex-shrink-0 rounded-full"
                     width={28}

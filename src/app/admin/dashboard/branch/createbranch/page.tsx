@@ -116,9 +116,8 @@ export default function LoginForm() {
 
     if (!validateForm()) return;
 
-    console.log("Form submitted:", formData);
     setSuccess("Form submitted successfully!");
-    const res = await fetch("/api/branch", {
+    await fetch("/api/branch", {
       method: "POST",
       body: JSON.stringify({
         branchName: formData.branchName,

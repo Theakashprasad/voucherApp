@@ -1,13 +1,13 @@
 "use client";
 import React, { useEffect, useState } from "react";
-import { number } from "zod";
 import { useRouter } from "next/navigation";
 
 interface VoucherFormData {
   voucherBookRange: string;
   voucherNo: string;
   invoiceNo: string;
-  date: string;
+  voucherGivenDate: string;
+  date: string; // kept for compatibility, not shown in UI
   supplier: string;
   amount: number;
   dues: number;
@@ -18,6 +18,7 @@ interface VoucherFormData {
   chqCashIssuedDate: string;
   amountPaid: number;
   voucherClearedDate: string;
+  remarks?: string;
 }
 
 interface FormErrors {
@@ -34,6 +35,7 @@ const initialFormData: VoucherFormData = {
   voucherBookRange: "",
   voucherNo: "",
   invoiceNo: "",
+  voucherGivenDate: "",
   date: "",
   supplier: "",
   amount: 0,
@@ -45,6 +47,7 @@ const initialFormData: VoucherFormData = {
   chqCashIssuedDate: "",
   amountPaid: 0,
   voucherClearedDate: "",
+  remarks: "",
 };
 
 export default function CreateVoucherPage({
@@ -97,10 +100,8 @@ export default function CreateVoucherPage({
           ),
         ]);
         const a = await voucherRes.json();
-        console.log("voucherRes", a);
         if (branchRes.ok) {
           const branchData = await branchRes.json();
-          console.log("Branch data from API:", branchData);
 
           // Load vouchers from API response
           const vouchers = Array.isArray(branchData?.vouchers)
@@ -153,6 +154,11 @@ export default function CreateVoucherPage({
               voucherBookRange: v?.voucherBook || "",
               voucherNo: v?.voucherNo || "",
               invoiceNo: v?.remarks || "",
+              voucherGivenDate: v?.voucherGivenDate
+                ? new Date(v.voucherGivenDate).toISOString().slice(0, 10)
+                : v?.date
+                ? new Date(v.date).toISOString().slice(0, 10)
+                : "",
               date: v?.date ? new Date(v.date).toISOString().slice(0, 10) : "",
               supplier: v?.supplier || "",
               amount: Number(v?.amount ?? 0),
@@ -168,6 +174,7 @@ export default function CreateVoucherPage({
               voucherClearedDate: v?.voucherClearedDate
                 ? new Date(v.voucherClearedDate).toISOString().slice(0, 10)
                 : "",
+              remarks: v?.remarks || "",
             }));
             setOriginalVoucherBookName(v?.voucherBook || null);
             setOriginalVoucherNo(v?.voucherNo || null);
@@ -227,7 +234,6 @@ export default function CreateVoucherPage({
               const nextNumbervalue = usedNumbers.length
                 ? Math.max(...usedNumbers) + 1
                 : null;
-              console.log("sdsd", nextNumbervalue);
               setNextNumber(nextNumbervalue);
               // Only auto-set voucher number if it's currently empty
               setFormData((prev) => ({
@@ -254,20 +260,6 @@ export default function CreateVoucherPage({
     setFormData((prev) => {
       const updated = { ...prev, [field]: value };
 
-      if (["amount", "dues", "return", "discountAdvance"].includes(field)) {
-        const amount =
-          field === "amount" ? Number(value) : Number(updated.amount);
-        const dues = field === "dues" ? Number(value) : Number(updated.dues);
-        const returnAmount =
-          field === "return" ? Number(value) : Number(updated.return);
-        const discountAdvance =
-          field === "discountAdvance"
-            ? Number(value)
-            : Number(updated.discountAdvance);
-
-        updated.netBalance = amount - dues - returnAmount - discountAdvance;
-      }
-
       return updated;
     });
 
@@ -293,8 +285,8 @@ export default function CreateVoucherPage({
         alert("Please select a Voucher Number.");
         return;
       }
-      if (!formData.date) {
-        alert("Please select a Date.");
+      if (!formData.voucherGivenDate) {
+        alert("Please select a Voucher Given Date.");
         return;
       }
       if (!formData.supplier) {
@@ -309,7 +301,7 @@ export default function CreateVoucherPage({
         previousVoucherBookName: originalVoucherBookName,
         previousVoucherNo: originalVoucherNo,
         date: formData.date,
-        voucherGivenDate: formData.date,
+        voucherGivenDate: formData.voucherGivenDate,
         supplier: formData.supplier,
         amount: formData.amount,
         dues: formData.dues,
@@ -320,7 +312,7 @@ export default function CreateVoucherPage({
         chqCashIssuedDate: formData.chqCashIssuedDate || null,
         amountPaid: formData.amountPaid,
         voucherClearedDate: formData.voucherClearedDate || null,
-        remarks: formData.invoiceNo || "",
+        remarks: formData.remarks || formData.invoiceNo || "",
         status: formData.voucherClearedDate ? "active" : "pending",
       };
 
@@ -338,6 +330,7 @@ export default function CreateVoucherPage({
 
       alert("Voucher updated successfully!");
       setFormData(initialFormData);
+      router.push("/") 
     } catch (error) {
       alert("Error saving voucher. Please try again.");
     } finally {
@@ -419,7 +412,6 @@ export default function CreateVoucherPage({
             <select
               value={formData.voucherNo}
               onChange={async (e) => {
-                console.log("asdf", e.target.value);
                 await handleInputChange(
                   "voucherNo",
                   e.target.value ?? nextNumber
@@ -474,18 +466,34 @@ export default function CreateVoucherPage({
             />
           </div>
 
-          {/* Date */}
+          {/* Voucher Given Date */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Date
+              Voucher Given Date
             </label>
             <input
               type="date"
-              value={formData.date}
+              value={formData.voucherGivenDate}
               onChange={async (e) =>
-                await handleInputChange("date", e.target.value)
+                await handleInputChange("voucherGivenDate", e.target.value)
               }
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+
+          {/* Remarks */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Remarks
+            </label>
+            <input
+              type="text"
+              value={formData.remarks || ""}
+              onChange={async (e) =>
+                await handleInputChange("remarks", e.target.value)
+              }
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
+              placeholder="Enter remarks"
             />
           </div>
 
@@ -657,9 +665,16 @@ export default function CreateVoucherPage({
             </label>
             <input
               type="number"
-              value={formData.netBalance.toFixed(2)}
-              readOnly
-              className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-100 text-gray-700"
+              step="0.01"
+              value={formData.netBalance || ""}
+              onChange={async (e) =>
+                await handleInputChange(
+                  "netBalance",
+                  parseFloat(e.target.value) || 0
+                )
+              }
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
+              placeholder="0.00"
             />
           </div>
 

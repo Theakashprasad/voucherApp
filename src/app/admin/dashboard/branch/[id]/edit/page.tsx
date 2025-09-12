@@ -7,7 +7,6 @@ import {
   MapPin,
   Receipt,
   Plus,
-  X,
   Eye,
   EyeOff,
 } from "lucide-react";
@@ -28,9 +27,8 @@ interface FormData {
   vouchers: Voucher[];
 }
 
-export default function page() {
+export default function Page() {
   const { id: editbranch } = useParams<{ id: string }>();
-  console.log("editbranch", editbranch);
 
   const [formData, setFormData] = useState<FormData>({
     branchName: "",
@@ -170,7 +168,7 @@ export default function page() {
       }
 
       setSuccess("Branch updated successfully!");
-    } catch (e) {
+    } catch (error) {
       setError("Something went wrong while updating the branch");
     }
   };

@@ -46,7 +46,6 @@ export default function LoginPage() {
   const onSubmit = async (values: LoginFormValues) => {
     setLoading(true);
     try {
-      console.log("dfsadf");
       const res = await fetch("/api/login", {
         method: "POST",
         body: JSON.stringify({
@@ -58,16 +57,21 @@ export default function LoginPage() {
 
       const data = await res.json();
       if (!res.ok || data?.success === false) {
-        console.log("slddlsk");
         toast.error(`${data.error}`);
         return;
       }
       if (res.ok) {
-        localStorage.setItem("branchDetails", JSON.stringify(data.branch));
+        // Save role-specific info
+        localStorage.setItem("token", String(data.token));
+        if (data?.role === "admin" && data?.admin) {
+          localStorage.setItem("adminDetails", JSON.stringify(data.admin));
+        }
+        if (data?.role === "user" && data?.branch) {
+          localStorage.setItem("branchDetails", JSON.stringify(data.branch));
+        }
         toast.success("Login successful");
-        router.push("/"); // navigates client-side
+        router.push(data?.role === "admin" ? "/admin/dashboard" : "/");
       }
-
     } catch (err) {
       console.error("❌ Login error:", err);
     } finally {

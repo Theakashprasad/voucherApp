@@ -3,7 +3,7 @@ import mongoose, { Schema, Document } from "mongoose";
 export interface IVoucherEntry extends Document {
   branchId: string;
   voucherNo: string;
-  date: Date;
+  invoiceNo?: string;
   voucherGivenDate: Date;
   supplier: string;
   amount: number;
@@ -24,7 +24,7 @@ const VoucherEntrySchema = new Schema<IVoucherEntry>(
   {
     branchId: { type: String, required: true, trim: true },
     voucherNo: { type: String, required: true, trim: true },
-    date: { type: Date, required: true },
+    invoiceNo: { type: String, trim: true },
     voucherGivenDate: { type: Date, required: true },
     supplier: { type: String, required: true, trim: true },
     amount: { type: Number, required: true, min: 0 },

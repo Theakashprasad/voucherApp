@@ -42,20 +42,11 @@ export async function POST(req: Request) {
       branchId,
       voucherBookName,
       voucherNo,
-      date,
+      invoiceNo,
       voucherGivenDate,
       supplier,
       amount,
-      dues,
-      return: returnAmount,
-      discountAdvance,
-      netBalance,
-      modeOfPayment,
-      chqCashIssuedDate,
-      amountPaid,
-      voucherClearedDate,
       remarks,
-      status,
     } = raw ?? {};
 
     // basic required fields
@@ -111,18 +102,7 @@ export async function POST(req: Request) {
     }
 
     // normalize and validate status
-    const normalizedStatus =
-      typeof status === "string" ? status.trim().toLowerCase() : undefined;
-    if (
-      normalizedStatus !== undefined &&
-      normalizedStatus !== "pending" &&
-      normalizedStatus !== "active"
-    ) {
-      return NextResponse.json(
-        { success: false, error: "status must be 'pending' or 'active'" },
-        { status: 400 }
-      );
-    }
+    const normalizedStatus = "pending" as const;
 
     // Start transaction to reserve and create atomically
     session = await mongoose.startSession();
@@ -146,18 +126,18 @@ export async function POST(req: Request) {
             branchId,
             voucherBook: voucherBookName,
             voucherNo: String(voucherNo),
-            date,
+            invoiceNo,
             voucherGivenDate,
             supplier,
             amount,
-            dues,
-            return: returnAmount,
-            discountAdvance,
-            netBalance,
-            modeOfPayment,
-            chqCashIssuedDate,
-            amountPaid,
-            voucherClearedDate,
+            dues: 0,
+            return: 0,
+            discountAdvance: 0,
+            netBalance: 0,
+            modeOfPayment: "CASH",
+            chqCashIssuedDate: undefined,
+            amountPaid: 0,
+            voucherClearedDate: undefined,
             remarks,
             status: normalizedStatus,
           },
@@ -183,6 +163,7 @@ export async function POST(req: Request) {
 }
 
 export async function PATCH(req: Request) {
+  let session: mongoose.ClientSession | undefined = undefined;
   try {
     await connectDb();
     const body = await req.json();
@@ -192,6 +173,7 @@ export async function PATCH(req: Request) {
       branchId,
       voucherBookName,
       voucherNo,
+      invoiceNo,
       previousVoucherBookName,
       previousVoucherNo,
       date,
@@ -217,9 +199,17 @@ export async function PATCH(req: Request) {
       );
     }
 
+    // Load existing voucher to determine actual previous values if not provided
+    const existingVoucher = await VoucherEntry.findById(voucherEntryId);
+
+    const effectivePrevBook =
+      previousVoucherBookName ?? existingVoucher?.voucherBook ?? undefined;
+    const effectivePrevNo =
+      previousVoucherNo ?? existingVoucher?.voucherNo ?? undefined;
+
     const voucherChanged =
-      voucherBookName !== previousVoucherBookName ||
-      voucherNo !== previousVoucherNo;
+      voucherBookName !== effectivePrevBook ||
+      String(voucherNo) !== String(effectivePrevNo);
 
     if (voucherChanged) {
       if (!branchId || !voucherBookName || !voucherNo) {
@@ -239,8 +229,8 @@ export async function PATCH(req: Request) {
         "vouchers.usedVouchers": String(voucherNo),
       });
       const sameAsPrev =
-        previousVoucherBookName === voucherBookName &&
-        previousVoucherNo === voucherNo;
+        String(effectivePrevBook) === String(voucherBookName) &&
+        String(effectivePrevNo) === String(voucherNo);
       if (conflict && !sameAsPrev) {
         return NextResponse.json(
           { success: false, error: "Voucher number already used" },
@@ -248,23 +238,29 @@ export async function PATCH(req: Request) {
         );
       }
 
-      if (previousVoucherBookName && previousVoucherNo) {
-        await Branch.updateOne(
-          { _id: branchId, "vouchers.name": previousVoucherBookName },
-          { $pull: { "vouchers.$.usedVouchers": String(previousVoucherNo) } }
-        );
-      }
+      session = await mongoose.startSession();
+      await session.withTransaction(async () => {
+        if (effectivePrevBook && effectivePrevNo) {
+          await Branch.updateOne(
+            { _id: branchId, "vouchers.name": String(effectivePrevBook) },
+            { $pull: { "vouchers.$.usedVouchers": String(effectivePrevNo) } },
+            { session }
+          );
+        }
 
-      await Branch.updateOne(
-        { _id: branchId, "vouchers.name": voucherBookName },
-        { $addToSet: { "vouchers.$.usedVouchers": String(voucherNo) } }
-      );
+        await Branch.updateOne(
+          { _id: branchId, "vouchers.name": voucherBookName },
+          { $addToSet: { "vouchers.$.usedVouchers": String(voucherNo) } },
+          { session }
+        );
+      });
     }
 
     const update: Record<string, unknown> = {
       branchId,
       voucherBook: voucherBookName,
       voucherNo,
+      invoiceNo,
       date,
       voucherGivenDate,
       supplier,
@@ -307,5 +303,9 @@ export async function PATCH(req: Request) {
       { success: false, error: "Failed to update voucher" },
       { status: 500 }
     );
+  } finally {
+    if (session) {
+      await session.endSession();
+    }
   }
 }
