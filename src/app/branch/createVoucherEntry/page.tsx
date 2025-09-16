@@ -1,6 +1,7 @@
 "use client";
 import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { toast, Toaster } from "sonner";
 
 interface VoucherFormData {
   voucherBookRange: string;
@@ -72,13 +73,13 @@ export default function CreateVoucherPage() {
             : [];
           const mapped: VoucherBook[] = vouchers
             .filter(
-              (v: any) =>
+              (v: Record<string, unknown>) =>
                 v &&
                 typeof v.name === "string" &&
                 typeof v.start === "number" &&
                 typeof v.end === "number"
             )
-            .map((v: any) => ({
+            .map((v: Record<string, unknown>) => ({
               name: v.name,
               startRange: v.start,
               endRange: v.end,
@@ -135,24 +136,22 @@ export default function CreateVoucherPage() {
           if (res.ok) {
             const branchData = await res.json();
             const voucherBook = branchData.vouchers?.find(
-              (v: any) => v.name === value
+              (v: Record<string, unknown>) => v.name === value
             );
             if (voucherBook?.usedVouchers) {
               const usedNumbers = voucherBook.usedVouchers
                 .map((v: string) => parseInt(v, 10))
                 .filter((n: number) => !isNaN(n));
               setReservedNumbers(usedNumbers);
-              // Calculate next available number, but don't exceed the book's end range
+              // Calculate next available number and hide if beyond end range
               const startRange = selectedBook.startRange;
               const endRange = selectedBook.endRange;
-              const nextNumbervalue = usedNumbers.length
-                ? Math.min(Math.max(...usedNumbers) + 1, endRange + 1) // Don't exceed end range
+              const candidateNext = usedNumbers.length
+                ? Math.max(...usedNumbers) + 1
                 : startRange;
 
-              // If all numbers in range are used, don't suggest next number
-              const isRangeExhausted =
-                usedNumbers.length === endRange - startRange + 1;
-              const finalNextNumber = isRangeExhausted ? null : nextNumbervalue;
+              const finalNextNumber =
+                candidateNext > endRange ? null : candidateNext;
 
               setNextNumber(finalNextNumber);
               setFormData((prev) => ({
@@ -192,31 +191,72 @@ export default function CreateVoucherPage() {
 
     try {
       if (!branchId) {
-        alert("Missing branch ID. Please log in again.");
+        toast.error("Missing branch ID. Please log in again.");
         return;
       }
       // Basic required checks
       if (!formData.voucherBookRange) {
-        alert("Please select a Voucher Book.");
+        toast.error("Please select a Voucher Book.");
         return;
       }
       if (!formData.voucherNo) {
-        alert("Please select a Voucher Number.");
+        toast.error("Please select a Voucher Number.");
         return;
       }
       if (!formData.voucherGivenDate) {
-        alert("Please select a Voucher Given Date.");
+        toast.error("Please select a Voucher Given Date.");
         return;
       }
       if (!formData.supplier) {
-        alert("Please select a Supplier.");
+        toast.error("Please select a Supplier.");
+        return;
+      }
+
+      // New validations for Invoice No, Amount and Remarks
+      if (!String(formData.invoiceNo).trim()) {
+        toast.error("Please enter an Invoice No.");
+        return;
+      }
+
+      if (!formData.amount || Number(formData.amount) <= 0) {
+        toast.error("Amount must be greater than 0.");
+        return;
+      }
+
+      if (!formData.remarks || !formData.remarks.trim()) {
+        toast.error("Please enter remarks.");
+        return;
+      }
+
+      // Validate voucher number is within the selected book range
+      const selectedBook = voucherBookOptions.find(
+        (book) => book.name === formData.voucherBookRange
+      );
+      if (!selectedBook) {
+        toast.error("Invalid Voucher Book selection.");
+        return;
+      }
+
+      const proposedVoucherNo: number | null = formData.voucherNo
+        ? parseInt(formData.voucherNo, 10)
+        : nextNumber;
+
+      if (
+        proposedVoucherNo === null ||
+        Number.isNaN(proposedVoucherNo) ||
+        proposedVoucherNo < selectedBook.startRange ||
+        proposedVoucherNo > selectedBook.endRange
+      ) {
+        toast.error(
+          `Voucher number must be between ${selectedBook.startRange} and ${selectedBook.endRange}.`
+        );
         return;
       }
 
       const payload = {
         branchId,
         voucherBookName: formData.voucherBookRange,
-        voucherNo: formData.voucherNo ?? nextNumber,
+        voucherNo: String(proposedVoucherNo),
         invoiceNo: formData.invoiceNo,
         voucherGivenDate: formData.voucherGivenDate,
         supplier: formData.supplier,
@@ -234,15 +274,18 @@ export default function CreateVoucherPage() {
 
       const data = await res.json();
       if (!res.ok || data?.success === false) {
-        alert(data?.error || `Failed to save voucher (HTTP ${res.status})`);
+        toast.error(
+          data?.error || `Failed to save voucher (HTTP ${res.status})`
+        );
         return;
       }
 
-      alert("Voucher saved successfully!");
+      toast.success("Voucher saved successfully");
+
       setNextNumber(null);
       setFormData(initialFormData);
-    } catch (error) {
-      alert("Error saving voucher. Please try again.");
+    } catch {
+      toast.error("Error saving voucher. Please try again.");
     } finally {
       setIsLoading(false);
     }
@@ -271,22 +314,25 @@ export default function CreateVoucherPage() {
 
           // Set the new supplier as selected
           await handleInputChange("supplier", newSupplierName.trim());
+          toast.success(" successfully");
 
           // Reset form
           setNewSupplierName("");
           setShowAddSupplier(false);
         } else {
-          alert("Failed to add supplier. Please try again.");
+          toast.error("Failed to add supplier. Please try again.");
         }
       } catch (error) {
         console.error("Error adding supplier:", error);
-        alert("Error adding supplier. Please try again.");
+        toast.error("Error adding supplier. Please try again.");
       }
     }
   };
 
   return (
     <div className="min-h-screen bg-transparent py-12 px-6">
+      <Toaster position="top-right" expand={true} />
+
       <div className="max-w-7xl mx-auto">
         <h2 className="text-3xl font-semibold text-gray-900 mb-8">
           Create New Voucher
@@ -334,12 +380,12 @@ export default function CreateVoucherPage() {
                 {nextNumber !== null
                   ? String(nextNumber)
                   : formData.voucherBookRange
-                  ? "No available numbers in this range"
+                  ? "Please Select Voucher number"
                   : "Select Voucher Book First"}
               </option>
               {formData.voucherBookRange &&
                 getVoucherNumbers(formData.voucherBookRange).map((number) => {
-                  const selectedBook = voucherBookOptions.find(
+                  voucherBookOptions.find(
                     (b) => b.name === formData.voucherBookRange
                   );
                   const num = parseInt(number, 10);
@@ -364,7 +410,7 @@ export default function CreateVoucherPage() {
               Invoice No.
             </label>
             <input
-              type="text"
+              type="number"
               value={formData.invoiceNo}
               onChange={async (e) =>
                 await handleInputChange("invoiceNo", e.target.value)
@@ -495,19 +541,7 @@ export default function CreateVoucherPage() {
             />
           </div>
 
-          {/* Dues moved to edit page */}
-
-          {/* Return moved to edit page */}
-
-          {/* Discount/Advance moved to edit page */}
-
-          {/* Net Balance moved to edit page */}
-
-          {/* Amount Paid moved to edit page */}
-
-          {/* CHQ / Cash Issued Date moved to edit page */}
-
-          {/* Voucher Cleared Date moved to edit page */}
+        
         </div>
 
         {/* Submit Button */}

@@ -6,11 +6,52 @@ import Admin from "../../../model/admin";
 
 const JWT_SECRET = process.env.JWT_SECRET as string;
 
+export async function PATCH(req: Request) {
+  try {
+    const { adminId, newPassword } = await req.json();
+    console.log("PATCH request received:", { adminId, newPassword });
+
+    await connectDb();
+
+    if (!adminId || !newPassword) {
+      console.log("Missing required fields");
+      return NextResponse.json(
+        { error: "Admin ID and new password are required" },
+        { status: 400 }
+      );
+    }
+
+    const admin = await Admin.findById(adminId);
+    console.log("Found admin:", admin ? "Yes" : "No");
+
+    if (!admin) {
+      return NextResponse.json({ error: "Admin not found" }, { status: 404 });
+    }
+
+    // Update the password
+    admin.password = newPassword;
+    await admin.save();
+    console.log("Password updated successfully");
+
+    return NextResponse.json({
+      success: true,
+      message: "Password updated successfully",
+    });
+  } catch (error) {
+    console.error("Error updating password:", error);
+    return NextResponse.json(
+      { error: "Something went wrong" },
+      { status: 500 }
+    );
+  }
+}
+
 export async function POST(req: Request) {
   try {
     const { username, password } = await req.json();
     await connectDb();
-    // Admin login (plaintext password check as requested)
+    /////////////////////////////////////////////////////// ADMIN
+
     if (username === "Adminlazzanio") {
       const admin = await Admin.findOne({ username: "Adminlazzanio" });
       if (!admin || admin.password !== password) {
@@ -30,7 +71,11 @@ export async function POST(req: Request) {
         success: true,
         message: "Login successful",
         token,
-        admin: { _id: String(admin._id), username: admin.username },
+        admin: {
+          _id: String(admin._id),
+          username: admin.username,
+          password: admin.password,
+        },
         role: "admin",
       });
 
@@ -51,6 +96,7 @@ export async function POST(req: Request) {
 
       return res;
     }
+    /////////////////////////////////////////////////////// USER
     const branch = await Branch.findOne({ username });
     if (!branch) {
       return NextResponse.json(
@@ -97,7 +143,7 @@ export async function POST(req: Request) {
     });
 
     return res;
-  } catch (error) {
+  } catch {
     return NextResponse.json(
       { success: false, error: "Something went wrong" },
       { status: 500 }

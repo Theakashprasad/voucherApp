@@ -42,7 +42,7 @@ export async function PATCH(req: Request) {
     if (typeof body.username === "string") branch.username = body.username;
     if (typeof body.password === "string") branch.password = body.password; // hash if needed
     if (Array.isArray(body.vouchers)) {
-      branch.vouchers = body.vouchers.map((v: any) => ({
+      branch.vouchers = body.vouchers.map((v: Record<string, unknown>) => ({
         name: String(v.name ?? ""),
         start: Number(v.start ?? 0),
         end: Number(v.end ?? 0),
@@ -107,7 +107,7 @@ export async function PUT(
     if (typeof body.username === "string") branch.username = body.username;
     if (typeof body.password === "string") branch.password = body.password; // consider hashing elsewhere
     if (Array.isArray(body.vouchers)) {
-      branch.vouchers = body.vouchers.map((v: any) => ({
+      branch.vouchers = body.vouchers.map((v: Record<string, unknown>) => ({
         name: String(v.name ?? ""),
         start: Number(v.start ?? 0),
         end: Number(v.end ?? 0),

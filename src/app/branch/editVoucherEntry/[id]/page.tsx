@@ -1,6 +1,7 @@
 "use client";
 import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { toast, Toaster } from "sonner";
 
 interface VoucherFormData {
   voucherBookRange: string;
@@ -82,11 +83,12 @@ export default function CreateVoucherPage({
       try {
         // Get branch ID from localStorage
         const raw = localStorage.getItem("branchDetails");
+        console.log('raw', raw)
         if (!raw) return;
         const parsed = JSON.parse(raw);
         const branchIdFromStorage =
           typeof parsed?._id === "string" ? parsed._id : null;
-
+        console.log('branchIdFromStorage',branchIdFromStorage)
         if (!branchIdFromStorage) return;
 
         setBranchId(branchIdFromStorage);
@@ -109,13 +111,13 @@ export default function CreateVoucherPage({
             : [];
           const mapped: VoucherBook[] = vouchers
             .filter(
-              (v: any) =>
+              (v: Record<string, unknown>) =>
                 v &&
                 typeof v.name === "string" &&
                 typeof v.start === "number" &&
                 typeof v.end === "number"
             )
-            .map((v: any) => ({
+            .map((v: Record<string, unknown>) => ({
               name: v.name,
               startRange: v.start,
               endRange: v.end,
@@ -134,7 +136,7 @@ export default function CreateVoucherPage({
             // Preload reserved numbers for current voucher book without overriding voucherNo
             if (v?.voucherBook && Array.isArray(branchData?.vouchers)) {
               const vb = branchData.vouchers.find(
-                (x: any) => x?.name === v.voucherBook
+                (x: Record<string, unknown>) => x?.name === v.voucherBook
               );
               if (vb?.usedVouchers) {
                 const usedNumbers = vb.usedVouchers
@@ -190,7 +192,7 @@ export default function CreateVoucherPage({
     };
 
     loadBranchData();
-  }, []);
+  }, [voucherId]);
   // Generate voucher numbers based on selected book range
   const getVoucherNumbers = (bookRange: string) => {
     const selectedBook = voucherBookOptions.find(
@@ -223,7 +225,7 @@ export default function CreateVoucherPage({
           if (res.ok) {
             const branchData = await res.json();
             const voucherBook = branchData.vouchers?.find(
-              (v: any) => v.name === value
+              (v: Record<string, unknown>) => v.name === value
             );
             if (voucherBook?.usedVouchers) {
               const usedNumbers = voucherBook.usedVouchers
@@ -328,10 +330,13 @@ export default function CreateVoucherPage({
         return;
       }
 
-      alert("Voucher updated successfully!");
+      toast.success("Voucher updated successfully!");
+
       setFormData(initialFormData);
-      router.push("/") 
-    } catch (error) {
+      setTimeout(() => {
+        router.back();
+      }, 1000);
+    } catch {
       alert("Error saving voucher. Please try again.");
     } finally {
       setIsLoading(false);
@@ -377,6 +382,8 @@ export default function CreateVoucherPage({
 
   return (
     <div className="min-h-screen bg-gray-100 py-10">
+      <Toaster position="top-right" expand={true} />
+
       <div className="max-w-6xl mx-auto bg-white rounded-lg shadow-md p-8">
         <h2 className="text-2xl font-semibold text-gray-800 mb-8">
           Create New Voucher
@@ -429,7 +436,7 @@ export default function CreateVoucherPage({
               </option>
               {formData.voucherBookRange &&
                 getVoucherNumbers(formData.voucherBookRange).map((number) => {
-                  const selectedBook = voucherBookOptions.find(
+                  voucherBookOptions.find(
                     (b) => b.name === formData.voucherBookRange
                   );
                   const num = parseInt(number, 10);
@@ -563,22 +570,6 @@ export default function CreateVoucherPage({
                 </div>
               </div>
             )}
-          </div>
-
-          {/* Mode of Payment */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Mode of Payment
-            </label>
-            <input
-              type="text"
-              value={formData.modeOfPayment}
-              onChange={async (e) =>
-                await handleInputChange("modeOfPayment", e.target.value)
-              }
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
-              placeholder="Enter mode of payment"
-            />
           </div>
 
           {/* Amount */}
@@ -734,7 +725,7 @@ export default function CreateVoucherPage({
           <button
             onClick={() => {
               setFormData(initialFormData);
-              router.push("/");
+              router.back();
             }}
             className="px-6 py-2 rounded-md border text-gray-600 hover:bg-gray-100"
           >

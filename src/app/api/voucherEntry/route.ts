@@ -24,7 +24,7 @@ export async function GET(req: Request) {
 
     const all = await VoucherEntry.find();
     return NextResponse.json(all, { status: 200 });
-  } catch (error) {
+  } catch {
     return NextResponse.json(
       { success: false, error: "Error fetching vouchers" },
       { status: 500 }
@@ -106,7 +106,7 @@ export async function POST(req: Request) {
 
     // Start transaction to reserve and create atomically
     session = await mongoose.startSession();
-    let createdDoc = null as any;
+    let createdDoc = null as unknown;
 
     await session.withTransaction(async () => {
       // Reserve voucher number; if already present, modifiedCount will be 0
@@ -151,8 +151,9 @@ export async function POST(req: Request) {
       { success: true, voucher: createdDoc },
       { status: 201 }
     );
-  } catch (error: any) {
-    const message = error?.message || "Failed to create voucher";
+  } catch (error: unknown) {
+    const message =
+      error instanceof Error ? error.message : "Failed to create voucher";
     const status = message === "Voucher number already used" ? 400 : 500;
     return NextResponse.json({ success: false, error: message }, { status });
   } finally {
@@ -163,7 +164,6 @@ export async function POST(req: Request) {
 }
 
 export async function PATCH(req: Request) {
-  let session: mongoose.ClientSession | undefined = undefined;
   try {
     await connectDb();
     const body = await req.json();
@@ -173,7 +173,6 @@ export async function PATCH(req: Request) {
       branchId,
       voucherBookName,
       voucherNo,
-      invoiceNo,
       previousVoucherBookName,
       previousVoucherNo,
       date,
@@ -199,17 +198,9 @@ export async function PATCH(req: Request) {
       );
     }
 
-    // Load existing voucher to determine actual previous values if not provided
-    const existingVoucher = await VoucherEntry.findById(voucherEntryId);
-
-    const effectivePrevBook =
-      previousVoucherBookName ?? existingVoucher?.voucherBook ?? undefined;
-    const effectivePrevNo =
-      previousVoucherNo ?? existingVoucher?.voucherNo ?? undefined;
-
     const voucherChanged =
-      voucherBookName !== effectivePrevBook ||
-      String(voucherNo) !== String(effectivePrevNo);
+      voucherBookName !== previousVoucherBookName ||
+      voucherNo !== previousVoucherNo;
 
     if (voucherChanged) {
       if (!branchId || !voucherBookName || !voucherNo) {
@@ -229,8 +220,8 @@ export async function PATCH(req: Request) {
         "vouchers.usedVouchers": String(voucherNo),
       });
       const sameAsPrev =
-        String(effectivePrevBook) === String(voucherBookName) &&
-        String(effectivePrevNo) === String(voucherNo);
+        previousVoucherBookName === voucherBookName &&
+        previousVoucherNo === voucherNo;
       if (conflict && !sameAsPrev) {
         return NextResponse.json(
           { success: false, error: "Voucher number already used" },
@@ -238,29 +229,29 @@ export async function PATCH(req: Request) {
         );
       }
 
-      session = await mongoose.startSession();
-      await session.withTransaction(async () => {
-        if (effectivePrevBook && effectivePrevNo) {
-          await Branch.updateOne(
-            { _id: branchId, "vouchers.name": String(effectivePrevBook) },
-            { $pull: { "vouchers.$.usedVouchers": String(effectivePrevNo) } },
-            { session }
-          );
-        }
-
-        await Branch.updateOne(
-          { _id: branchId, "vouchers.name": voucherBookName },
-          { $addToSet: { "vouchers.$.usedVouchers": String(voucherNo) } },
-          { session }
+      if (previousVoucherBookName && previousVoucherNo) {
+        console.log(
+          "previousVoucherBookName",
+          previousVoucherBookName,
+          "&&&",
+          previousVoucherNo
         );
-      });
+        await Branch.updateOne(
+          { _id: branchId, "vouchers.name": previousVoucherBookName },
+          { $pull: { "vouchers.$.usedVouchers": previousVoucherNo } }
+        );
+      }
+
+      await Branch.updateOne(
+        { _id: branchId, "vouchers.name": voucherBookName },
+        { $addToSet: { "vouchers.$.usedVouchers": String(voucherNo) } }
+      );
     }
 
     const update: Record<string, unknown> = {
       branchId,
       voucherBook: voucherBookName,
       voucherNo,
-      invoiceNo,
       date,
       voucherGivenDate,
       supplier,
@@ -298,14 +289,10 @@ export async function PATCH(req: Request) {
       { success: true, voucher: updated },
       { status: 200 }
     );
-  } catch (error) {
+  } catch {
     return NextResponse.json(
       { success: false, error: "Failed to update voucher" },
       { status: 500 }
     );
-  } finally {
-    if (session) {
-      await session.endSession();
-    }
   }
 }

@@ -9,6 +9,7 @@ export function middleware(req: NextRequest) {
     pathname === "/login" ||
     pathname.startsWith("/_next/") ||
     pathname.startsWith("/favicon.ico") ||
+    pathname.startsWith("/profile.ico") ||
     pathname.startsWith("/public/") ||
     pathname.startsWith("/assets/");
 
@@ -52,5 +53,7 @@ export function middleware(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!_next/|favicon.ico|api/|public/|assets/).*)"],
+  matcher: [
+    "/((?!_next/static|_next/image|_next/webpack-hmr|favicon.ico|api/|public/|assets/).*)",
+  ],
 };

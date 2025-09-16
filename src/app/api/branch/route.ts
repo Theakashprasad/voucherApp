@@ -44,7 +44,7 @@ export async function GET() {
     await connectDb();
     const branches = await Branch.find();
     return NextResponse.json(branches, { status: 200 });
-  } catch (error) {
+  } catch {
     return NextResponse.json(
       { error: "Something went wrong" },
       { status: 500 }
@@ -84,7 +84,11 @@ export async function PATCH(req: Request) {
           { status: 400 }
         );
       }
-      if (existingBranch.vouchers.some((v: any) => v.name === name)) {
+      if (
+        existingBranch.vouchers.some(
+          (v: Record<string, unknown>) => v.name === name
+        )
+      ) {
         return NextResponse.json(
           { error: "Voucher book name already exists" },
           { status: 400 }
@@ -119,7 +123,8 @@ export async function PATCH(req: Request) {
       }
       if (typeof name === "string" && name.trim().length) {
         const duplicate = existingBranch.vouchers.some(
-          (v: any, i: number) => i !== voucherIndex && v.name === name
+          (v: Record<string, unknown>, i: number) =>
+            i !== voucherIndex && v.name === name
         );
         if (duplicate) {
           return NextResponse.json(

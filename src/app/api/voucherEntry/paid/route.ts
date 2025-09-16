@@ -40,17 +40,20 @@ export async function PATCH(req: Request) {
         update.voucherClearedDate = new Date(voucherClearedDate);
       } else {
         // Unset when empty string provided
-        (update as any).$unset = { voucherClearedDate: "" };
+        (update as Record<string, unknown>).$unset = { voucherClearedDate: "" };
       }
     }
 
     // Handle set/unset chqCashIssuedDate in tandem
     if (typeof chqCashIssuedDate === "string") {
       if (chqCashIssuedDate.trim().length > 0) {
-        (update as any).chqCashIssuedDate = new Date(chqCashIssuedDate);
+        (update as Record<string, unknown>).chqCashIssuedDate = new Date(
+          chqCashIssuedDate
+        );
       } else {
-        (update as any).$unset = {
-          ...(update as any).$unset,
+        const updateObj = update as Record<string, unknown>;
+        updateObj.$unset = {
+          ...((updateObj.$unset as Record<string, unknown>) || {}),
           chqCashIssuedDate: "",
         };
       }
@@ -80,7 +83,7 @@ export async function PATCH(req: Request) {
       { success: true, voucher: updated },
       { status: 200 }
     );
-  } catch (error) {
+  } catch {
     return NextResponse.json(
       { success: false, error: "Failed to update voucher paid status" },
       { status: 500 }

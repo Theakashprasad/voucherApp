@@ -22,7 +22,7 @@ export default function AdminDashboardPage() {
         const data = await res.json();
         if (Array.isArray(data)) {
           setBranches(
-            data.map((b: any) => ({
+            data.map((b: Record<string, unknown>) => ({
               _id: String(b._id),
               branchName: String(b.branchName || ""),
             }))

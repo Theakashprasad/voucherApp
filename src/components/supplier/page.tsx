@@ -279,7 +279,7 @@ export function SupplierDialog() {
                       <AlertDialogTitle>Are you sure?</AlertDialogTitle>
                       <AlertDialogDescription>
                         This action cannot be undone. This will permanently
-                        delete the supplier "{supplier}".
+                        delete the supplier &quot;{supplier}&quot;.
                       </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>

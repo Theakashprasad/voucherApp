@@ -46,7 +46,7 @@ export function VoucherBookDialog() {
             ? branchData.vouchers
             : [];
           setVouchers(
-            list.map((v: any) => ({
+            list.map((v: Record<string, unknown>) => ({
               name: String(v?.name || ""),
               start: Number(v?.start || 0),
               end: Number(v?.end || 0),
@@ -54,7 +54,7 @@ export function VoucherBookDialog() {
           );
         } else if (Array.isArray(parsed?.vouchers)) {
           setVouchers(
-            parsed.vouchers.map((v: any) => ({
+            parsed.vouchers.map((v: Record<string, unknown>) => ({
               name: String(v?.name || ""),
               start: Number(v?.start || 0),
               end: Number(v?.end || 0),

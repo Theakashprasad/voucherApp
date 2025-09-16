@@ -1,4 +1,4 @@
-"use client"
+"use client";
 
 import {
   AlertDialog,
@@ -10,17 +10,19 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
   AlertDialogTrigger,
-} from "@/components/ui/alert-dialog"
-import { Button } from "@/components/ui/button"
+} from "@/components/ui/alert-dialog";
+import { Button } from "@/components/ui/button";
 
 type ConfirmDialogProps = {
-  triggerLabel?: React.ReactNode
-  title: string
-  description: string
-  confirmLabel?: string
-  cancelLabel?: string
-  onConfirm: () => void
-}
+  triggerLabel?: React.ReactNode;
+  title: string;
+  description: string;
+  confirmLabel?: string;
+  cancelLabel?: string;
+  onConfirm: () => void;
+  permission?: boolean;
+  disabled?: boolean;
+};
 
 export function ConfirmDialog({
   triggerLabel = "Open Dialog",
@@ -29,11 +31,20 @@ export function ConfirmDialog({
   confirmLabel = "Continue",
   cancelLabel = "Cancel",
   onConfirm,
+  permission = true,
+  disabled = false,
 }: ConfirmDialogProps) {
+  // If no permission, don't render the dialog
+  if (!permission) {
+    return null;
+  }
+
   return (
     <AlertDialog>
       <AlertDialogTrigger asChild>
-        <Button variant="outline">{triggerLabel}</Button>
+        <Button variant="outline" disabled={disabled}>
+          {triggerLabel}
+        </Button>
       </AlertDialogTrigger>
       <AlertDialogContent>
         <AlertDialogHeader>
@@ -42,9 +53,11 @@ export function ConfirmDialog({
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel>{cancelLabel}</AlertDialogCancel>
-          <AlertDialogAction onClick={onConfirm}>{confirmLabel}</AlertDialogAction>
+          <AlertDialogAction onClick={onConfirm} disabled={disabled}>
+            {confirmLabel}
+          </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
-  )
+  );
 }

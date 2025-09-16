@@ -76,6 +76,10 @@ export default function Page() {
     status: false,
   });
   const [data, setData] = useState<Voucher[]>([]);
+  const [pageIndex, setPageIndex] = useState(0);
+  const [pageSize, setPageSize] = useState(10);
+  const [totalCount, setTotalCount] = useState(0);
+  const [grandTotalAmount, setGrandTotalAmount] = useState(0);
 
   // Date range filter helpers
   type DateRange = { from?: string; to?: string };
@@ -116,15 +120,55 @@ export default function Page() {
       if (!branchIdFromStorage) return;
       if (branchNameFromStorage) setBranchName(branchNameFromStorage);
       try {
-        const res = await fetch(`/api/voucherEntry/${branchIdFromStorage}`);
+        setLoading(true);
+        const params = new URLSearchParams();
+        params.set("page", String(pageIndex + 1));
+        params.set("pageSize", String(pageSize));
+
+        if (sorting?.[0]) {
+          params.set("sortBy", sorting[0].id);
+          params.set("sortDir", sorting[0].desc ? "desc" : "asc");
+        }
+
+        const addDateParams = (
+          keyPrefix: string,
+          range: { from?: string; to?: string }
+        ) => {
+          if (range.from) params.set(`${keyPrefix}From`, range.from);
+          if (range.to) params.set(`${keyPrefix}To`, range.to);
+        };
+        addDateParams("created", issueDateRange);
+        addDateParams("given", givenDateRange);
+        addDateParams("cleared", clearedDateRange);
+
+        const voucherNoFilter = (
+          table.getColumn("voucherNo")?.getFilterValue() as string
+        )?.trim();
+        if (voucherNoFilter) params.set("voucherNo", voucherNoFilter);
+
+        const statusFilter = table.getColumn("status")?.getFilterValue() as
+          | string
+          | undefined;
+        if (statusFilter) params.set("status", statusFilter);
+
+        const res = await fetch(
+          `/api/voucherEntry/${branchIdFromStorage}?${params.toString()}`
+        );
         if (!res.ok) throw new Error("Failed to fetch vouchers");
         const response = await res.json();
 
-        // Handle both old format (array) and new format (object with vouchers property)
-        if (Array.isArray(response)) {
-          setData(response);
+        const vouchers: Voucher[] = Array.isArray(response)
+          ? response
+          : response.vouchers || [];
+        setData(vouchers);
+        if (!Array.isArray(response)) {
+          setTotalCount(Number(response.totalCount || 0));
+          setGrandTotalAmount(Number(response.grandTotalAmount || 0));
         } else {
-          setData(response.vouchers || []);
+          setTotalCount(vouchers.length);
+          setGrandTotalAmount(
+            vouchers.reduce((s, v) => s + (v.amount || 0), 0)
+          );
         }
       } catch (err) {
         console.error(err);
@@ -134,12 +178,20 @@ export default function Page() {
     };
 
     fetchVouchers();
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    pageIndex,
+    pageSize,
+    sorting,
+    issueDateRange,
+    givenDateRange,
+    clearedDateRange,
+  ]);
 
   const columns: ColumnDef<Voucher>[] = [
     {
       id: "paid",
-      header: () => <div className="text-xs">Paid</div>,
+      header: () => <div className="text-sm">Paid</div>,
       cell: ({ row }) => {
         const isPaid = Boolean(row.original.voucherClearedDate);
         const handleStatusChange = async (checked: boolean) => {
@@ -190,7 +242,7 @@ export default function Page() {
                 });
               }
             }
-          } catch (e) {
+          } catch {
             setData(previous);
             toast.error("Error updating voucher status");
           }
@@ -242,7 +294,7 @@ export default function Page() {
       accessorKey: "voucherNo",
       header: "Voucher No",
       cell: ({ row }) => (
-        <div className="font-mono font-medium text-blue-600">
+        <div className="font-mono font-medium text-blue-600 text-sm">
           {row.getValue("voucherNo")}
         </div>
       ),
@@ -252,7 +304,7 @@ export default function Page() {
       accessorKey: "voucherBook",
       header: "Voucher Book",
       cell: ({ row }) => (
-        <div className="font-medium">{row.getValue("voucherBook")}</div>
+        <div className="font-medium text-sm">{row.getValue("voucherBook")}</div>
       ),
       enableSorting: false,
     },
@@ -260,7 +312,9 @@ export default function Page() {
       accessorKey: "invoiceNo",
       header: "Invoice No",
       cell: ({ row }) => (
-        <div className="font-medium">{row.getValue("invoiceNo") || "-"}</div>
+        <div className="font-medium text-sm">
+          {row.getValue("invoiceNo") || "-"}
+        </div>
       ),
       enableSorting: false,
     },
@@ -275,7 +329,9 @@ export default function Page() {
           <Button
             variant="ghost"
             onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-          >
+            className="uppercase"
+
+         >
             Date
             <ArrowUpDown className="ml-2 h-4 w-4" />
           </Button>
@@ -284,7 +340,7 @@ export default function Page() {
       cell: ({ row }) => {
         const raw = row.getValue("createdAt") as string | undefined;
         const display = raw ? String(raw).slice(0, 10) : "-";
-        return <div>{display}</div>;
+        return <div className="text-sm">{display}</div>;
       },
     },
     {
@@ -298,6 +354,7 @@ export default function Page() {
           <Button
             variant="ghost"
             onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+          className="uppercase"
           >
             Voucher Given Date
             <ArrowUpDown className="ml-2 h-4 w-4" />
@@ -307,7 +364,32 @@ export default function Page() {
       cell: ({ row }) => {
         const raw = row.getValue("voucherGivenDate") as string | undefined;
         const display = raw ? String(raw).slice(0, 10) : "-";
-        return <div>{display}</div>;
+        return <div className="text-sm">{display}</div>;
+      },
+    },
+    {
+      accessorKey: "voucherClearedDate",
+      filterFn: (row, id, value: DateRange) => {
+        if (!value || (!value.from && !value.to)) return true;
+        return isWithinDateRange(row.getValue(id), value);
+      },
+      header: ({ column }) => {
+        return (
+          <Button
+            variant="ghost"
+            onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+            className="uppercase"
+
+        >
+            Voucher Cleared Date
+            <ArrowUpDown className="ml-2 h-4 w-4" />
+          </Button>
+        );
+      },
+      cell: ({ row }) => {
+        const raw = row.getValue("voucherClearedDate") as string | undefined;
+        const display = raw ? String(raw).slice(0, 10) : "-";
+        return <div className="text-sm">{display}</div>;
       },
     },
 
@@ -315,7 +397,7 @@ export default function Page() {
       accessorKey: "supplier",
       header: "Supplier",
       cell: ({ row }) => (
-        <div className="font-medium">{row.getValue("supplier")}</div>
+        <div className="font-medium text-sm">{row.getValue("supplier")}</div>
       ),
       enableSorting: false,
     },
@@ -339,7 +421,9 @@ export default function Page() {
           style: "currency",
           currency: "INR",
         }).format(amount);
-        return <div className="text-right font-medium">{formatted}</div>;
+        return (
+          <div className="text-right font-medium text-sm">{formatted}</div>
+        );
       },
     },
     {
@@ -375,7 +459,7 @@ export default function Page() {
           style: "currency",
           currency: "INR",
         }).format(dues);
-        return <div className="text-right">{formatted}</div>;
+        return <div className="text-right text-sm">{formatted}</div>;
       },
       enableSorting: false,
     },
@@ -388,7 +472,7 @@ export default function Page() {
           style: "currency",
           currency: "INR",
         }).format(returnAmount);
-        return <div className="text-right">{formatted}</div>;
+        return <div className="text-right text-sm">{formatted}</div>;
       },
       enableSorting: false,
     },
@@ -401,7 +485,7 @@ export default function Page() {
           style: "currency",
           currency: "INR",
         }).format(discountAdvance);
-        return <div className="text-right">{formatted}</div>;
+        return <div className="text-right text-sm">{formatted}</div>;
       },
       enableSorting: false,
     },
@@ -414,7 +498,9 @@ export default function Page() {
           style: "currency",
           currency: "INR",
         }).format(netBalance);
-        return <div className="text-right font-medium">{formatted}</div>;
+        return (
+          <div className="text-right font-medium text-sm">{formatted}</div>
+        );
       },
       enableSorting: false,
     },
@@ -424,7 +510,7 @@ export default function Page() {
       cell: ({ row }) => {
         const raw = row.getValue("chqCashIssuedDate") as string | undefined;
         const display = raw ? String(raw).slice(0, 10) : "-";
-        return <div>{display}</div>;
+        return <div className="text-sm">{display}</div>;
       },
       enableSorting: false,
     },
@@ -437,40 +523,18 @@ export default function Page() {
           style: "currency",
           currency: "INR",
         }).format(amountPaid);
-        return <div className="text-right">{formatted}</div>;
+        return <div className="text-right text-sm">{formatted}</div>;
       },
       enableSorting: false,
     },
-    {
-      accessorKey: "voucherClearedDate",
-      filterFn: (row, id, value: DateRange) => {
-        if (!value || (!value.from && !value.to)) return true;
-        return isWithinDateRange(row.getValue(id), value);
-      },
-      header: ({ column }) => {
-        return (
-          <Button
-            variant="ghost"
-            onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-          >
-            Voucher Cleared Date
-            <ArrowUpDown className="ml-2 h-4 w-4" />
-          </Button>
-        );
-      },
-      cell: ({ row }) => {
-        const raw = row.getValue("voucherClearedDate") as string | undefined;
-        const display = raw ? String(raw).slice(0, 10) : "-";
-        return <div>{display}</div>;
-      },
-    },
+
     {
       accessorKey: "remarks",
       header: "Remarks",
       cell: ({ row }) => (
         <HoverCard>
           <HoverCardTrigger asChild>
-            <div className="max-w-xs truncate cursor-pointer hover:text-blue-600">
+            <div className="max-w-xs truncate cursor-pointer hover:text-blue-600 text-sm">
               {row.getValue("remarks")}
             </div>
           </HoverCardTrigger>
@@ -526,13 +590,23 @@ export default function Page() {
       sorting,
       columnFilters,
       columnVisibility,
+      pagination: { pageIndex, pageSize },
+    },
+    pageCount: Math.max(1, Math.ceil(totalCount / pageSize)),
+    onPaginationChange: (updater) => {
+      if (typeof updater === "function") {
+        const next = updater({ pageIndex, pageSize });
+        setPageIndex(next.pageIndex);
+        setPageSize(next.pageSize);
+      } else {
+        setPageIndex(updater.pageIndex);
+        setPageSize(updater.pageSize);
+      }
     },
   });
 
   // Calculate totals for filtered data (for display purposes)
-  const filteredGrandTotalAmount = table
-    .getFilteredRowModel()
-    .rows.reduce((sum, row) => sum + row.original.amount, 0);
+  const filteredGrandTotalAmount = grandTotalAmount;
 
   const escapeForCsv = (value: unknown) => {
     const asString = value === null || value === undefined ? "" : String(value);
@@ -662,7 +736,7 @@ export default function Page() {
               <CardContent className="p-3">
                 <div className="text-xs text-gray-500">Total Vouchers</div>
                 <div className="text-xl font-semibold text-gray-900">
-                  {table.getFilteredRowModel().rows.length}
+                  {totalCount}
                 </div>
               </CardContent>
             </Card>
@@ -696,6 +770,7 @@ export default function Page() {
                         };
                         setIssueDateRange(next);
                         table.getColumn("createdAt")?.setFilterValue(next);
+                        setPageIndex(0);
                       }}
                       className="px-2 py-1 border border-gray-300 rounded"
                     />
@@ -710,6 +785,7 @@ export default function Page() {
                         };
                         setIssueDateRange(next);
                         table.getColumn("createdAt")?.setFilterValue(next);
+                        setPageIndex(0);
                       }}
                       className="px-2 py-1 border border-gray-300 rounded"
                     />
@@ -728,6 +804,7 @@ export default function Page() {
                         table
                           .getColumn("voucherGivenDate")
                           ?.setFilterValue(next);
+                        setPageIndex(0);
                       }}
                       className="px-2 py-1 border border-gray-300 rounded"
                     />
@@ -744,6 +821,7 @@ export default function Page() {
                         table
                           .getColumn("voucherGivenDate")
                           ?.setFilterValue(next);
+                        setPageIndex(0);
                       }}
                       className="px-2 py-1 border border-gray-300 rounded"
                     />
@@ -762,6 +840,7 @@ export default function Page() {
                         table
                           .getColumn("voucherClearedDate")
                           ?.setFilterValue(next);
+                        setPageIndex(0);
                       }}
                       className="px-2 py-1 border border-gray-300 rounded"
                     />
@@ -778,6 +857,7 @@ export default function Page() {
                         table
                           .getColumn("voucherClearedDate")
                           ?.setFilterValue(next);
+                        setPageIndex(0);
                       }}
                       className="px-2 py-1 border border-gray-300 rounded"
                     />
@@ -790,11 +870,12 @@ export default function Page() {
                           .getColumn("status")
                           ?.getFilterValue() as string) ?? ""
                       }
-                      onChange={(e) =>
+                      onChange={(e) => {
                         table
                           .getColumn("status")
-                          ?.setFilterValue(e.target.value || undefined)
-                      }
+                          ?.setFilterValue(e.target.value || undefined);
+                        setPageIndex(0);
+                      }}
                       className="px-2 py-1 border border-gray-300 rounded text-xs"
                     >
                       <option value="">All</option>
@@ -820,6 +901,7 @@ export default function Page() {
                           ?.setFilterValue(undefined);
                         table.getColumn("voucherNo")?.setFilterValue("");
                         table.getColumn("status")?.setFilterValue(undefined);
+                        setPageIndex(0);
                       }}
                     >
                       Reset Filters
@@ -843,11 +925,12 @@ export default function Page() {
                       .getColumn("voucherNo")
                       ?.getFilterValue() as string) ?? ""
                   }
-                  onChange={(event) =>
+                  onChange={(event) => {
                     table
                       .getColumn("voucherNo")
-                      ?.setFilterValue(event.target.value)
-                  }
+                      ?.setFilterValue(event.target.value);
+                    setPageIndex(0);
+                  }}
                   className="max-w-md text-sm"
                 />
               </div>
@@ -894,7 +977,7 @@ export default function Page() {
                   <TableRow key={headerGroup.id}>
                     {headerGroup.headers.map((header) => {
                       return (
-                        <TableHead key={header.id} className="text-base p-4">
+                        <TableHead key={header.id} className="text-sm uppercase p-3 ">
                           {header.isPlaceholder
                             ? null
                             : flexRender(
@@ -917,7 +1000,7 @@ export default function Page() {
                       }
                     >
                       {row.getVisibleCells().map((cell) => (
-                        <TableCell key={cell.id} className="text-base p-4">
+                        <TableCell key={cell.id} className="text-sm p-3">
                           {flexRender(
                             cell.column.columnDef.cell,
                             cell.getContext()
@@ -973,8 +1056,8 @@ export default function Page() {
             <div className="flex items-center gap-1 text-xs text-gray-600">
               <span>Page</span>
               <strong>
-                {table.getState().pagination.pageIndex + 1} of{" "}
-                {table.getPageCount()}
+                {pageIndex + 1} of{" "}
+                {Math.max(1, Math.ceil(totalCount / pageSize))}
               </strong>
             </div>
 
@@ -982,8 +1065,8 @@ export default function Page() {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => table.setPageIndex(0)}
-                disabled={!table.getCanPreviousPage()}
+                onClick={() => setPageIndex(0)}
+                disabled={pageIndex === 0}
                 className="text-xs px-2 py-1 h-8"
               >
                 {"<<"}
@@ -991,8 +1074,8 @@ export default function Page() {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => table.previousPage()}
-                disabled={!table.getCanPreviousPage()}
+                onClick={() => setPageIndex((p) => Math.max(0, p - 1))}
+                disabled={pageIndex === 0}
                 className="text-xs px-3 py-1 h-8"
               >
                 Previous
@@ -1001,8 +1084,11 @@ export default function Page() {
               {/* Page Numbers */}
               <div className="flex items-center gap-1">
                 {(() => {
-                  const pageCount = table.getPageCount();
-                  const currentPage = table.getState().pagination.pageIndex;
+                  const pageCount = Math.max(
+                    1,
+                    Math.ceil(totalCount / pageSize)
+                  );
+                  const currentPage = pageIndex;
                   const pages = [];
 
                   // Show first page
@@ -1012,7 +1098,7 @@ export default function Page() {
                         key={0}
                         variant={currentPage === 0 ? "default" : "outline"}
                         size="sm"
-                        onClick={() => table.setPageIndex(0)}
+                        onClick={() => setPageIndex(0)}
                         className="text-xs px-2 py-1 h-8 w-8"
                       >
                         1
@@ -1041,7 +1127,7 @@ export default function Page() {
                           key={i}
                           variant={currentPage === i ? "default" : "outline"}
                           size="sm"
-                          onClick={() => table.setPageIndex(i)}
+                          onClick={() => setPageIndex(i)}
                           className="text-xs px-2 py-1 h-8 w-8"
                         >
                           {i + 1}
@@ -1068,7 +1154,7 @@ export default function Page() {
                           currentPage === pageCount - 1 ? "default" : "outline"
                         }
                         size="sm"
-                        onClick={() => table.setPageIndex(pageCount - 1)}
+                        onClick={() => setPageIndex(pageCount - 1)}
                         className="text-xs px-2 py-1 h-8 w-8"
                       >
                         {pageCount}
@@ -1083,8 +1169,10 @@ export default function Page() {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => table.nextPage()}
-                disabled={!table.getCanNextPage()}
+                onClick={() => setPageIndex((p) => p + 1)}
+                disabled={
+                  pageIndex + 1 >= Math.max(1, Math.ceil(totalCount / pageSize))
+                }
                 className="text-xs px-3 py-1 h-8"
               >
                 Next
@@ -1092,8 +1180,14 @@ export default function Page() {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => table.setPageIndex(table.getPageCount() - 1)}
-                disabled={!table.getCanNextPage()}
+                onClick={() =>
+                  setPageIndex(
+                    Math.max(0, Math.ceil(totalCount / pageSize) - 1)
+                  )
+                }
+                disabled={
+                  pageIndex + 1 >= Math.max(1, Math.ceil(totalCount / pageSize))
+                }
                 className="text-xs px-2 py-1 h-8"
               >
                 {">>"}

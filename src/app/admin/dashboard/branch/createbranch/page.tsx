@@ -1,5 +1,7 @@
 "use client";
 import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { toast, Toaster } from "sonner";
 import {
   User,
   Lock,
@@ -25,15 +27,17 @@ interface FormData {
 }
 
 export default function LoginForm() {
+  const router = useRouter();
   const [formData, setFormData] = useState<FormData>({
     branchName: "",
     username: "",
     password: "",
-    vouchers: [{ name: "", start: "", end: "" }],
+    vouchers: [],
   });
   const [error, setError] = useState<string>("");
   const [success, setSuccess] = useState<string>("");
   const [showPassword, setShowPassword] = useState<boolean>(false);
+  const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -88,8 +92,21 @@ export default function LoginForm() {
       return false;
     }
 
-    for (let i = 0; i < formData.vouchers.length; i++) {
-      const voucher = formData.vouchers[i];
+    // Filter out empty vouchers before validation
+    const nonEmptyVouchers = formData.vouchers.filter(
+      (voucher) => voucher.name.trim() || voucher.start || voucher.end
+    );
+
+    // If there are no vouchers at all, that's fine - allow creation without vouchers
+    if (nonEmptyVouchers.length === 0) {
+      return true;
+    }
+
+    // Validate only non-empty vouchers
+    for (let i = 0; i < nonEmptyVouchers.length; i++) {
+      const voucher = nonEmptyVouchers[i];
+
+      // If any field is filled, all fields must be filled
       if (!voucher.name.trim()) {
         setError(`Voucher ${i + 1} name is required`);
         return false;
@@ -98,6 +115,7 @@ export default function LoginForm() {
         setError(`Voucher ${i + 1} range is required`);
         return false;
       }
+
       const start = parseInt(voucher.start);
       const end = parseInt(voucher.end);
       if (isNaN(start) || isNaN(end) || start < 1 || end < 1 || start > end) {
@@ -113,40 +131,72 @@ export default function LoginForm() {
   const handleSubmit = async (): Promise<void> => {
     setError("");
     setSuccess("");
+    setIsSubmitting(true);
 
-    if (!validateForm()) return;
+    if (!validateForm()) {
+      setIsSubmitting(false);
+      return;
+    }
 
-    setSuccess("Form submitted successfully!");
-    await fetch("/api/branch", {
-      method: "POST",
-      body: JSON.stringify({
-        branchName: formData.branchName,
-        username: formData.username,
-        password: formData.password,
-        vouchers: formData.vouchers,
-      }),
-      headers: { "Content-Type": "application/json" },
-    });
-    // Reset form after successful submission
-    setTimeout(() => {
+    try {
+      // Filter out empty vouchers before sending to API
+      const validVouchers = formData.vouchers.filter(
+        (voucher) => voucher.name.trim() || voucher.start || voucher.end
+      );
+
+      const response = await fetch("/api/branch", {
+        method: "POST",
+        body: JSON.stringify({
+          branchName: formData.branchName,
+          username: formData.username,
+          password: formData.password,
+          vouchers: validVouchers,
+        }),
+        headers: { "Content-Type": "application/json" },
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        const errorMessage = errorData?.error || "Failed to create branch";
+        setError(errorMessage);
+        toast.error(errorMessage);
+        return;
+      }
+
+      await response.json();
+      setSuccess("Branch created successfully!");
+      toast.success("Branch created successfully!");
+
+      // Reset form after successful submission
       setFormData({
         branchName: "",
         username: "",
         password: "",
-        vouchers: [{ name: "", start: "", end: "" }],
+        vouchers: [],
       });
-      setSuccess("");
-    }, 2000);
+
+      // Redirect to admin dashboard after a short delay
+      router.push("/admin/dashboard");
+    } catch (error) {
+      console.error("Error creating branch:", error);
+      const errorMessage = "Network error. Please try again.";
+      setError(errorMessage);
+      toast.error(errorMessage);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
     <div className="min-h-screen bg-transparent flex items-start justify-center p-6">
+      <Toaster position="top-right" expand={true} />
+
       <div className="w-full max-w-5xl">
         <div className="mb-8">
-          <h2 className="text-3xl font-semibold text-gray-900 mb-1">
+          <h2 className="text-3xl font-heading font-semibold text-gray-900 mb-1">
             Create Branch
           </h2>
-          <p className="text-sm text-gray-600">
+          <p className="text-sm text-gray-600 font-sans">
             Enter branch details to continue
           </p>
         </div>
@@ -174,7 +224,7 @@ export default function LoginForm() {
               <div className="relative">
                 <label
                   htmlFor="branchName"
-                  className="block text-sm font-medium text-gray-700 mb-1"
+                  className="block text-sm font-heading font-medium text-gray-700 mb-1"
                 >
                   Branch Name
                 </label>
@@ -196,7 +246,7 @@ export default function LoginForm() {
               <div className="relative">
                 <label
                   htmlFor="username"
-                  className="block text-sm font-medium text-gray-700 mb-1"
+                  className="block text-sm font-heading font-medium text-gray-700 mb-1"
                 >
                   Username
                 </label>
@@ -218,7 +268,7 @@ export default function LoginForm() {
               <div className="relative">
                 <label
                   htmlFor="password"
-                  className="block text-sm font-medium text-gray-700 mb-1"
+                  className="block text-sm font-heading font-medium text-gray-700 mb-1"
                 >
                   Password
                 </label>
@@ -253,13 +303,13 @@ export default function LoginForm() {
               {/* Vouchers Section */}
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
-                  <label className="block text-sm font-medium text-gray-700">
+                  <label className="block text-sm font-heading font-medium text-gray-700">
                     Vouchers
                   </label>
                   <button
                     type="button"
                     onClick={addVoucher}
-                    className="flex items-center gap-1 px-3 py-1.5 text-xs border border-blue-200 text-blue-700 rounded-md hover:bg-blue-50 transition-colors"
+                    className="flex items-center gap-1 px-3 py-1.5 text-xs border border-blue-200 text-blue-700 rounded-md hover:bg-blue-50 transition-colors font-heading font-medium"
                   >
                     <Plus className="w-3 h-3" />
                     Add
@@ -267,65 +317,76 @@ export default function LoginForm() {
                 </div>
 
                 <div className="max-h-64 overflow-y-auto space-y-3">
-                  {formData.vouchers.map((voucher, index) => (
-                    <div
-                      key={index}
-                      className="border border-gray-200 rounded-lg p-4 space-y-3"
-                    >
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs font-medium text-gray-600">
-                          Voucher {index + 1}
-                        </span>
-                        {formData.vouchers.length > 1 && (
-                          <button
-                            type="button"
-                            onClick={() => removeVoucher(index)}
-                            className="text-red-500 hover:text-red-700 p-1"
-                          >
-                            <X className="w-3 h-3" />
-                          </button>
-                        )}
-                      </div>
-
-                      {/* Voucher Name */}
-                      <div className="relative">
-                        <Receipt className="absolute left-2 top-1/2 transform -translate-y-1/2 text-gray-400 w-3 h-3" />
-                        <input
-                          type="text"
-                          value={voucher.name}
-                          onChange={(e) =>
-                            handleVoucherChange(index, "name", e.target.value)
-                          }
-                          className="w-full pl-7 pr-2 py-2 border border-gray-300 rounded-md focus:ring-1 focus:ring-blue-500 focus:border-transparent outline-none transition-all duration-200 text-base"
-                          placeholder="Name (e.g., ABC)"
-                        />
-                      </div>
-
-                      {/* Voucher Range */}
-                      <div className="grid grid-cols-2 gap-3">
-                        <input
-                          type="number"
-                          min="1"
-                          value={voucher.start}
-                          onChange={(e) =>
-                            handleVoucherChange(index, "start", e.target.value)
-                          }
-                          className="w-full px-2 py-2 border border-gray-300 rounded-md focus:ring-1 focus:ring-blue-500 focus:border-transparent outline-none transition-all duration-200 text-base text-center"
-                          placeholder="Start"
-                        />
-                        <input
-                          type="number"
-                          min="1"
-                          value={voucher.end}
-                          onChange={(e) =>
-                            handleVoucherChange(index, "end", e.target.value)
-                          }
-                          className="w-full px-2 py-2 border border-gray-300 rounded-md focus:ring-1 focus:ring-blue-500 focus:border-transparent outline-none transition-all duration-200 text-base text-center"
-                          placeholder="End"
-                        />
-                      </div>
+                  {formData.vouchers.length === 0 ? (
+                    <div className="text-center py-8 text-gray-500 text-sm font-sans">
+                      No vouchers added yet. Click &quot;Add&quot; to create
+                      voucher books.
                     </div>
-                  ))}
+                  ) : (
+                    formData.vouchers.map((voucher, index) => (
+                      <div
+                        key={index}
+                        className="border border-gray-200 rounded-lg p-4 space-y-3"
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-heading font-medium text-gray-600">
+                            Voucher {index + 1}
+                          </span>
+                          {formData.vouchers.length > 1 && (
+                            <button
+                              type="button"
+                              onClick={() => removeVoucher(index)}
+                              className="text-red-500 hover:text-red-700 p-1"
+                            >
+                              <X className="w-3 h-3" />
+                            </button>
+                          )}
+                        </div>
+
+                        {/* Voucher Name */}
+                        <div className="relative">
+                          <Receipt className="absolute left-2 top-1/2 transform -translate-y-1/2 text-gray-400 w-3 h-3" />
+                          <input
+                            type="text"
+                            value={voucher.name}
+                            onChange={(e) =>
+                              handleVoucherChange(index, "name", e.target.value)
+                            }
+                            className="w-full pl-7 pr-2 py-2 border border-gray-300 rounded-md focus:ring-1 focus:ring-blue-500 focus:border-transparent outline-none transition-all duration-200 text-base"
+                            placeholder="Name (e.g., ABC)"
+                          />
+                        </div>
+
+                        {/* Voucher Range */}
+                        <div className="grid grid-cols-2 gap-3">
+                          <input
+                            type="number"
+                            min="1"
+                            value={voucher.start}
+                            onChange={(e) =>
+                              handleVoucherChange(
+                                index,
+                                "start",
+                                e.target.value
+                              )
+                            }
+                            className="w-full px-2 py-2 border border-gray-300 rounded-md focus:ring-1 focus:ring-blue-500 focus:border-transparent outline-none transition-all duration-200 text-base text-center"
+                            placeholder="Start"
+                          />
+                          <input
+                            type="number"
+                            min="1"
+                            value={voucher.end}
+                            onChange={(e) =>
+                              handleVoucherChange(index, "end", e.target.value)
+                            }
+                            className="w-full px-2 py-2 border border-gray-300 rounded-md focus:ring-1 focus:ring-blue-500 focus:border-transparent outline-none transition-all duration-200 text-base text-center"
+                            placeholder="End"
+                          />
+                        </div>
+                      </div>
+                    ))
+                  )}
                 </div>
               </div>
 
@@ -333,9 +394,10 @@ export default function LoginForm() {
               <button
                 type="button"
                 onClick={handleSubmit}
-                className="w-full bg-blue-600 text-white py-3 px-4 rounded-lg font-medium hover:bg-blue-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all duration-200 text-base"
+                disabled={isSubmitting}
+                className="w-full bg-blue-600 text-white py-3 px-4 rounded-lg font-heading font-medium hover:bg-blue-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all duration-200 text-base disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                Create Branch
+                {isSubmitting ? "Creating Branch..." : "Create Branch"}
               </button>
             </div>
           </div>

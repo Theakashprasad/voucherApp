@@ -24,8 +24,8 @@ import { Loader2 } from "lucide-react";
 
 // ✅ validation schema
 const loginSchema = z.object({
-  username: z.string().min(3, "Username must be at least 3 characters"),
-  password: z.string().min(3, "Password must be at least 6 characters"),
+  username: z.string(),
+  password: z.string(),
 });
 
 type LoginFormValues = z.infer<typeof loginSchema>;
@@ -85,7 +85,7 @@ export default function LoginPage() {
 
       <Card className="w-full max-w-md shadow-xl rounded-2xl">
         <CardHeader>
-          <CardTitle className="text-center text-2xl font-bold">
+          <CardTitle className="text-center text-2xl font-heading font-semibold">
             Login
           </CardTitle>
         </CardHeader>
@@ -98,7 +98,9 @@ export default function LoginPage() {
                 name="username"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Username</FormLabel>
+                    <FormLabel className="font-heading font-medium">
+                      Username
+                    </FormLabel>
                     <FormControl>
                       <Input
                         type="text"
@@ -117,7 +119,9 @@ export default function LoginPage() {
                 name="password"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Password</FormLabel>
+                    <FormLabel className="font-heading font-medium">
+                      Password
+                    </FormLabel>
                     <FormControl>
                       <div className="relative">
                         <Input
@@ -144,7 +148,11 @@ export default function LoginPage() {
                 )}
               />
 
-              <Button type="submit" className="w-full" disabled={loading}>
+              <Button
+                type="submit"
+                className="w-full font-heading font-medium"
+                disabled={loading}
+              >
                 {loading ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />

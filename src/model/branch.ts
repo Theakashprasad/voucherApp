@@ -31,7 +31,7 @@ const VoucherSchema = new Schema<IVoucher>({
 const BranchSchema = new Schema<IBranch>(
   {
     branchName: { type: String, required: true, trim: true },
-    username: { type: String, required: true, unique: true, trim: true },
+    username: { type: String, required: true, trim: true },
     password: { type: String, required: true }, // hash before saving
     vouchers: { type: [VoucherSchema], default: [] },
     Supplier: { type: [String], default: () => [] },
