@@ -13,6 +13,7 @@ export interface IBranch extends Document {
   password: string;
   vouchers: IVoucher[];
   Supplier: string[];
+  columnVisibility?: Record<string, boolean>;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -35,6 +36,7 @@ const BranchSchema = new Schema<IBranch>(
     password: { type: String, required: true }, // hash before saving
     vouchers: { type: [VoucherSchema], default: [] },
     Supplier: { type: [String], default: () => [] },
+    columnVisibility: { type: Schema.Types.Mixed, default: {} },
   },
   { timestamps: true }
 );

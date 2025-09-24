@@ -40,7 +40,7 @@ export async function GET(
 
     // Filters
     const voucherNo = searchParams.get("voucherNo");
-    const status = searchParams.get("status"); // 'pending' | 'active'
+    const statusRaw = searchParams.get("status"); // 'pending' | 'active' | 'cancel'
     const supplier = searchParams.get("supplier");
 
     const createdFrom = searchParams.get("createdFrom");
@@ -58,7 +58,11 @@ export async function GET(
     if (supplier && supplier.trim().length > 0) {
       query.supplier = { $regex: supplier.trim(), $options: "i" };
     }
-    if (status && (status === "pending" || status === "active")) {
+    const status =
+      typeof statusRaw === "string"
+        ? statusRaw.trim().toLowerCase()
+        : undefined;
+    if (status === "pending" || status === "active" || status === "cancel") {
       query.status = status;
     }
 

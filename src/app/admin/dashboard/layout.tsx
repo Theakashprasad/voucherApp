@@ -37,7 +37,7 @@ export default function DashboardLayout({
     <SidebarProvider>
       <DashboardSidebar />
       <SidebarInset className="overflow-x-hidden">
-        <div className="flex items-center justify-between p-4 border-b">
+        <div className="flex items-center justify-between p-6 border-b">
           <div className="flex items-center gap-5">
             <SidebarTrigger />
             {/* <h1 className="text-xl font-semibold">Dashboard</h1> */}

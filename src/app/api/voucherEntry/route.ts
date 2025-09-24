@@ -133,8 +133,7 @@ export async function POST(req: Request) {
             dues: 0,
             return: 0,
             discountAdvance: 0,
-            netBalance: 0,
-            modeOfPayment: "CASH",
+            netBalance: amount,
             chqCashIssuedDate: undefined,
             amountPaid: 0,
             voucherClearedDate: undefined,
@@ -142,7 +141,7 @@ export async function POST(req: Request) {
             status: normalizedStatus,
           },
         ],
-        { session }
+        { session, ordered: true }
       );
       createdDoc = docArr[0];
     });

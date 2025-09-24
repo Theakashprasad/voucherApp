@@ -1,51 +1,46 @@
 import mongoose, { Schema, Document } from "mongoose";
 
 export interface IVoucherEntry extends Document {
-  branchId: string;
-  voucherNo: string;
+  branchId?: string;
+  voucherNo?: string;
   invoiceNo?: string;
-  voucherGivenDate: Date;
-  supplier: string;
-  amount: number;
-  dues: number;
-  return: number;
-  discountAdvance: number;
-  netBalance: number;
-  modeOfPayment: string;
+  voucherGivenDate?: Date;
+  supplier?: string;
+  amount?: number;
+  dues?: number;
+  return?: number;
+  discountAdvance?: number;
+  netBalance?: number;
   chqCashIssuedDate?: Date;
-  amountPaid: number;
+  amountPaid?: number;
   voucherClearedDate?: Date;
   remarks?: string;
-  status: "pending" | "active";
-  voucherBook: string;
+  status?: "pending" | "active" | 'cancel';
+  voucherBook?: string;
 }
 
 const VoucherEntrySchema = new Schema<IVoucherEntry>(
   {
-    branchId: { type: String, required: true, trim: true },
-    voucherNo: { type: String, required: true, trim: true },
+    branchId: { type: String, trim: true },
+    voucherNo: { type: String, trim: true },
     invoiceNo: { type: String, trim: true },
-    voucherGivenDate: { type: Date, required: true },
-    supplier: { type: String, required: true, trim: true },
-    amount: { type: Number, required: true, min: 0 },
-    dues: { type: Number, required: true, min: 0 },
-    return: { type: Number, required: true, min: 0 },
-    discountAdvance: { type: Number, required: true, min: 0 },
-    netBalance: { type: Number, required: true, min: 0 },
-    modeOfPayment: {
-      type: String,
-      required: true,
-    },
+    voucherGivenDate: { type: Date },
+    supplier: { type: String, trim: true },
+    amount: { type: Number },
+    dues: { type: Number },
+    return: { type: Number },
+    discountAdvance: { type: Number },
+    netBalance: { type: Number },
     chqCashIssuedDate: { type: Date },
-    amountPaid: { type: Number, required: true, min: 0 },
+    amountPaid: { type: Number },
     voucherClearedDate: { type: Date },
     remarks: { type: String, trim: true },
     status: {
       type: String,
-      enum: ["pending", "active"],
+      enum: ["pending", "active", 'cancel'],
       default: "pending",
     },
-    voucherBook: { type: String, required: true, trim: true },
+    voucherBook: { type: String, trim: true },
   },
   { timestamps: true }
 );

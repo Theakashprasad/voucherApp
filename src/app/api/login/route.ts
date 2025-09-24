@@ -132,14 +132,14 @@ export async function POST(req: Request) {
       secure: process.env.NODE_ENV === "production",
       sameSite: "strict",
       path: "/",
-      maxAge: 60 * 60 * 24, // 1 day
+      maxAge: 60 * 60, // 1 hour
     });
     res.cookies.set("role", "user", {
       httpOnly: false,
       secure: process.env.NODE_ENV === "production",
       sameSite: "strict",
       path: "/",
-      maxAge: 60 * 60 * 24,
+      maxAge:  60 * 60, // 1 hour
     });
 
     return res;

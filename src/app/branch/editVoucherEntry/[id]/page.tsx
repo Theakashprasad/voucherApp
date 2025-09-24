@@ -2,6 +2,8 @@
 import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast, Toaster } from "sonner";
+import { ArrowLeft } from "lucide-react";
+import { ConfirmDialog } from "@/components/common/ConfirmDialog";
 
 interface VoucherFormData {
   voucherBookRange: string;
@@ -74,6 +76,10 @@ export default function CreateVoucherPage({
   const [originalVoucherNo, setOriginalVoucherNo] = useState<string | null>(
     null
   );
+  const [voucherStatus, setVoucherStatus] = useState<
+    "pending" | "active" | "cancel"
+  >("pending");
+  const canToggleCancel = true;
   const router = useRouter();
 
   const { id } = React.use(params); // ✅ unwrap the Promise
@@ -83,12 +89,12 @@ export default function CreateVoucherPage({
       try {
         // Get branch ID from localStorage
         const raw = localStorage.getItem("branchDetails");
-        console.log('raw', raw)
+        console.log("raw", raw);
         if (!raw) return;
         const parsed = JSON.parse(raw);
         const branchIdFromStorage =
           typeof parsed?._id === "string" ? parsed._id : null;
-        console.log('branchIdFromStorage',branchIdFromStorage)
+        console.log("branchIdFromStorage", branchIdFromStorage);
         if (!branchIdFromStorage) return;
 
         setBranchId(branchIdFromStorage);
@@ -133,6 +139,9 @@ export default function CreateVoucherPage({
           // Populate form with fetched voucher data (edit mode)
           if (Array.isArray(a) && a.length > 0) {
             const v = a[0];
+            if (typeof v?.status === "string") {
+              setVoucherStatus(v.status as "pending" | "active" | "cancel");
+            }
             // Preload reserved numbers for current voucher book without overriding voucherNo
             if (v?.voucherBook && Array.isArray(branchData?.vouchers)) {
               const vb = branchData.vouchers.find(
@@ -155,7 +164,7 @@ export default function CreateVoucherPage({
               ...prev,
               voucherBookRange: v?.voucherBook || "",
               voucherNo: v?.voucherNo || "",
-              invoiceNo: v?.remarks || "",
+              invoiceNo: v?.invoiceNo || "",
               voucherGivenDate: v?.voucherGivenDate
                 ? new Date(v.voucherGivenDate).toISOString().slice(0, 10)
                 : v?.date
@@ -296,10 +305,16 @@ export default function CreateVoucherPage({
         return;
       }
 
+      // Compute net balance as Amount - Advance at save time
+      const computedNetBalance =
+        (Number(formData.amount || 0) as number) -
+        (Number(formData.discountAdvance || 0) as number);
+
       const payload = {
         branchId,
         voucherBookName: formData.voucherBookRange,
         voucherNo: formData.voucherNo ?? nextNumber,
+        invoiceNo: formData.invoiceNo,
         previousVoucherBookName: originalVoucherBookName,
         previousVoucherNo: originalVoucherNo,
         date: formData.date,
@@ -309,12 +324,12 @@ export default function CreateVoucherPage({
         dues: formData.dues,
         return: formData.return,
         discountAdvance: formData.discountAdvance,
-        netBalance: formData.netBalance,
+        netBalance: computedNetBalance,
         modeOfPayment: (formData.modeOfPayment || "CASH").toUpperCase(),
         chqCashIssuedDate: formData.chqCashIssuedDate || null,
         amountPaid: formData.amountPaid,
         voucherClearedDate: formData.voucherClearedDate || null,
-        remarks: formData.remarks || formData.invoiceNo || "",
+        remarks: formData.remarks || "",
         status: formData.voucherClearedDate ? "active" : "pending",
       };
 
@@ -380,14 +395,46 @@ export default function CreateVoucherPage({
     }
   };
 
+  const handleToggleCancel = async () => {
+    try {
+      const res = await fetch(`/api/voucherEntry/${voucherId}/cancel`, {
+        method: "PATCH",
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || data?.success === false) {
+        toast.error(data?.error || `Failed to update voucher status`);
+        return;
+      }
+      const next = voucherStatus === "cancel" ? "pending" : "cancel";
+      setVoucherStatus(next);
+      toast.success(
+        next === "cancel" ? "Voucher cancelled" : "Voucher reactivated"
+      );
+      setTimeout(() => {
+        router.back();
+      }, 1000);
+    } catch {
+      toast.error("Operation failed. Please try again.");
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gray-100 py-10">
       <Toaster position="top-right" expand={true} />
 
       <div className="max-w-6xl mx-auto bg-white rounded-lg shadow-md p-8">
-        <h2 className="text-2xl font-semibold text-gray-800 mb-8">
-          Create New Voucher
-        </h2>
+        <div className="flex items-center justify-between mb-8">
+          <h2 className="text-2xl font-semibold text-gray-800">
+            Create New Voucher
+          </h2>
+          <button
+            onClick={() => router.push("/")}
+            className="flex items-center gap-2 px-5 py-2.5 bg-white/80 backdrop-blur-sm border border-gray-200 text-gray-700 hover:text-gray-900 hover:bg-white hover:shadow-md rounded-xl transition-all duration-200 group"
+          >
+            <ArrowLeft className="h-4 w-4 group-hover:-translate-x-1 transition-transform" />
+            <span className="text-sm font-medium">Back to Dashboard</span>
+          </button>
+        </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
           {/* Voucher Book Range */}
@@ -632,7 +679,7 @@ export default function CreateVoucherPage({
           {/* Discount/Advance */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Discount / Advance
+              Advance
             </label>
             <input
               type="number"
@@ -720,17 +767,29 @@ export default function CreateVoucherPage({
           </div>
         </div>
 
-        {/* Submit Button */}
+        {/* Actions */}
         <div className="mt-8 flex justify-end gap-4">
-          <button
-            onClick={() => {
-              setFormData(initialFormData);
-              router.back();
+          <ConfirmDialog
+            triggerLabel={
+              <span className="  text-red-400 hover:bg-gray-100  inline-block">
+                {voucherStatus === "cancel" ? "Uncancel" : "Cancel"}
+              </span>
+            }
+            title={
+              voucherStatus === "cancel" ? "Uncancel Voucher" : "Cancel Voucher"
+            }
+            description={
+              voucherStatus === "cancel"
+                ? "This will set the voucher back to pending."
+                : "This will mark the voucher as cancelled."
+            }
+            confirmLabel={voucherStatus === "cancel" ? "Uncancel" : "Cancel"}
+            cancelLabel="Close"
+            onConfirm={async () => {
+              await handleToggleCancel();
             }}
-            className="px-6 py-2 rounded-md border text-gray-600 hover:bg-gray-100"
-          >
-            Cancel
-          </button>
+            permission={canToggleCancel}
+          />
           <button
             onClick={handleSubmit}
             disabled={isLoading}

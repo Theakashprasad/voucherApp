@@ -38,7 +38,7 @@ function DesktopLinks({ pathname }: { pathname: string }) {
             href={item.href}
             className={
               isActive
-                ? "text-neutral-900 dark:text-neutral-100 font-medium"
+                ? "text-neutral-900 dark:text-neutral-100 uppercase font-bold "
                 : "text-neutral-600 dark:text-neutral-300 hover:text-neutral-900 dark:hover:text-neutral-100"
             }
           >
@@ -171,7 +171,7 @@ export default function Navbar() {
   };
 
   return (
-    <header className=" w-full border-b border-gray-200 bg-white shadow-sm">
+    <header className=" w-full border-b border-gray-200 bg-white h-20 py-3 shadow-sm">
       <div className="mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-center items-center h-16 relative">
           {/* Middle nav links - centered */}

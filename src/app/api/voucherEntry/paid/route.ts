@@ -11,6 +11,8 @@ export async function PATCH(req: Request) {
     const voucherClearedDate = body?.voucherClearedDate as string | undefined;
     const rawStatus = body?.status as string | undefined;
     const chqCashIssuedDate = body?.chqCashIssuedDate as string | undefined;
+    const amountPaid = body?.amountPaid as number | undefined;
+    const netBalance = body?.netBalance as number | undefined;
     const normalizedStatus =
       typeof rawStatus === "string"
         ? rawStatus.trim().toLowerCase()
@@ -57,6 +59,16 @@ export async function PATCH(req: Request) {
           chqCashIssuedDate: "",
         };
       }
+    }
+
+    // Handle amountPaid field
+    if (typeof amountPaid === "number") {
+      update.amountPaid = amountPaid;
+    }
+
+    // Handle netBalance field
+    if (typeof netBalance === "number") {
+      update.netBalance = netBalance;
     }
 
     if (Object.keys(update).length === 0) {
