@@ -87,7 +87,9 @@ export default function Page() {
   const [loading, setLoading] = useState(true);
   const [branchName, setBranchName] = useState<string>("");
   const [sorting, setSorting] = useState<SortingState>([]);
-  const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
+  const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([
+    { id: "status", value: "pending" },
+  ]);
   const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({
     status: false,
   });
@@ -965,23 +967,76 @@ export default function Page() {
     return wb;
   };
 
-  const handleExportExcel = () => {
-    const filteredRows = table
-      .getFilteredRowModel()
-      .rows.map((r) => r.original);
-    const useFiltered =
-      filteredRows.length > 0 && filteredRows.length < data.length;
-    const rows = useFiltered ? filteredRows : data;
+  const handleExportExcel = async () => {
+    try {
+      const raw = localStorage.getItem("branchDetails");
+      if (!raw) {
+        toast.error("Branch not selected");
+        return;
+      }
+      const parsed = JSON.parse(raw);
+      const branchIdFromStorage =
+        typeof parsed?._id === "string" ? parsed._id : null;
+      if (!branchIdFromStorage) {
+        toast.error("Invalid branch");
+        return;
+      }
 
-    const wb = createExcelFile(rows);
+      const params = new URLSearchParams();
+      params.set("page", "1");
+      params.set("pageSize", "1000000");
 
-    const suffix = useFiltered ? "filtered" : "all";
-    const today = new Date().toISOString().slice(0, 10);
-    const safeBranch = (branchName || "branch").replace(/[^a-z0-9-_]+/gi, "-");
-    const filename = `vouchers_${safeBranch}_${today}_${suffix}.xlsx`;
+      if (sorting?.[0]) {
+        params.set("sortBy", sorting[0].id);
+        params.set("sortDir", sorting[0].desc ? "desc" : "asc");
+      }
 
-    XLSX.writeFile(wb, filename);
-    toast.success(`Excel file exported successfully: ${filename}`);
+      const addDateParams = (
+        keyPrefix: string,
+        range: { from?: string; to?: string }
+      ) => {
+        if (range.from) params.set(`${keyPrefix}From`, range.from);
+        if (range.to) params.set(`${keyPrefix}To`, range.to);
+      };
+      addDateParams("created", issueDateRange);
+      addDateParams("given", givenDateRange);
+      addDateParams("cleared", clearedDateRange);
+
+      const voucherNoFilter = (
+        table.getColumn("voucherNo")?.getFilterValue() as string
+      )?.trim();
+      if (voucherNoFilter) params.set("voucherNo", voucherNoFilter);
+
+      const supplierFilter = (
+        table.getColumn("supplier")?.getFilterValue() as string
+      )?.trim();
+      if (supplierFilter) params.set("supplier", supplierFilter);
+
+      // Always export all statuses; intentionally ignore current status filter
+
+      const url = `/api/voucherEntry/${branchIdFromStorage}?${params.toString()}`;
+      const res = await fetch(url);
+      if (!res.ok) throw new Error("Failed to fetch all vouchers for export");
+      const payload = await res.json();
+      const rows: Voucher[] = Array.isArray(payload)
+        ? payload
+        : payload.vouchers || [];
+
+      const wb = createExcelFile(rows);
+
+      const today = new Date().toISOString().slice(0, 10);
+      const safeBranch = (branchName || "branch").replace(
+        /[^a-z0-9-_]+/gi,
+        "-"
+      );
+      const filename = `vouchers_${safeBranch}_${today}_all.xlsx`;
+
+      XLSX.writeFile(wb, filename);
+      toast.success(`Excel file exported successfully: ${filename}`);
+    } catch (e) {
+      console.error(e);
+      toast.error("Failed to export Excel");
+    }
   };
 
   return (
@@ -1464,7 +1519,13 @@ export default function Page() {
                   <select
                     value={table.getState().pagination.pageSize}
                     onChange={(e) => {
-                      table.setPageSize(Number(e.target.value));
+                      const value = e.target.value;
+                      if (value === "all") {
+                        setPageIndex(0);
+                        setPageSize(1000000);
+                      } else {
+                        table.setPageSize(Number(value));
+                      }
                     }}
                     className="px-3 py-1 border-2 border-gray-200 rounded-lg focus:ring-4 focus:ring-blue-100 focus:border-blue-500 transition-all duration-200"
                   >
@@ -1473,6 +1534,7 @@ export default function Page() {
                         {pageSize}
                       </option>
                     ))}
+                    <option value="all">Show All</option>
                   </select>
                 </div>
               </div>

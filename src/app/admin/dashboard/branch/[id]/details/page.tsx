@@ -17,6 +17,7 @@ import {
   ArrowUpDown,
   ChevronDown,
   Edit,
+  Plus,
   Filter,
   Search,
   Calendar,
@@ -30,7 +31,7 @@ import {
   ChevronRight,
   ChevronsLeft,
   ChevronsRight,
-  Trash2,
+  Trash,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 
@@ -79,12 +80,14 @@ export type Voucher = {
   status: "pending" | "active" | "cancel";
 };
 
-function PageImpl({ params }: { params: Promise<{ id: string }> }) {
+export default function Page() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
-  const [branchName] = useState<string>("");
+  const [branchName, setBranchName] = useState<string>("");
   const [sorting, setSorting] = useState<SortingState>([]);
-  const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
+  const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([
+    { id: "status", value: "pending" },
+  ]);
   const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({
     status: false,
   });
@@ -93,8 +96,16 @@ function PageImpl({ params }: { params: Promise<{ id: string }> }) {
   const [pageIndex, setPageIndex] = useState(0);
   const [pageSize, setPageSize] = useState(10);
   const [totalCount, setTotalCount] = useState(0);
-
-  const { id: branchId } = React.use(params);
+  const [overallTotalCount, setOverallTotalCount] = useState(0);
+  const [overallGrandTotalNetBalance, setOverallGrandTotalNetBalance] =
+    useState(0);
+  const [filteredGrandTotalNetBalance, setFilteredGrandTotalNetBalance] =
+    useState(0);
+  const [
+    filteredTotalCountExcludingCancelled,
+    setFilteredTotalCountExcludingCancelled,
+  ] = useState(0);
+  const [reloadKey, setReloadKey] = useState(0);
 
   // Save column visibility to database
   const saveColumnVisibility = async (newVisibility: VisibilityState) => {
@@ -153,18 +164,12 @@ function PageImpl({ params }: { params: Promise<{ id: string }> }) {
   useEffect(() => {
     const loadColumnVisibility = async () => {
       const raw = localStorage.getItem("branchDetails");
-      if (!raw) {
-        setColumnVisibilityLoaded(true);
-        return;
-      }
+      if (!raw) return;
       const parsed = JSON.parse(raw);
       const branchIdFromStorage =
         typeof parsed?._id === "string" ? parsed._id : null;
 
-      if (!branchIdFromStorage) {
-        setColumnVisibilityLoaded(true);
-        return;
-      }
+      if (!branchIdFromStorage) return;
 
       try {
         const res = await fetch(
@@ -196,7 +201,23 @@ function PageImpl({ params }: { params: Promise<{ id: string }> }) {
 
   useEffect(() => {
     const fetchVouchers = async () => {
-      if (!branchId) return;
+      // Get branch ID from localStorage
+      const raw = localStorage.getItem("branchDetails");
+      if (!raw) return;
+      const parsed = JSON.parse(raw);
+      const branchIdFromStorage =
+        typeof parsed?._id === "string" ? parsed._id : null;
+      const branchNameFromStorage =
+        typeof parsed?.name === "string"
+          ? parsed.name
+          : typeof parsed?.branchName === "string"
+          ? parsed.branchName
+          : typeof parsed?.branch?.name === "string"
+          ? parsed.branch.name
+          : "";
+
+      if (!branchIdFromStorage) return;
+      if (branchNameFromStorage) setBranchName(branchNameFromStorage);
       try {
         setLoading(true);
         const params = new URLSearchParams();
@@ -232,63 +253,127 @@ function PageImpl({ params }: { params: Promise<{ id: string }> }) {
         const statusFilter = table.getColumn("status")?.getFilterValue() as
           | string
           | undefined;
-        if (statusFilter) params.set("status", statusFilter);
+        if (statusFilter)
+          params.set("status", statusFilter.trim().toLowerCase());
 
-        const res = await fetch(
-          `/api/voucherEntry/${branchId}?${params.toString()}`
-        );
-        if (!res.ok) return;
-        const response = await res.json();
+        // Build URLs
+        const filteredUrl = `/api/voucherEntry/${branchIdFromStorage}?${params.toString()}`; // Table data with current filters
 
-        const vouchers = Array.isArray(response)
+        // Build URLs for totals excluding cancelled
+        const buildTotalsUrl = (
+          status: "pending" | "active" | "cancel",
+          withFilters: boolean
+        ) => {
+          const p = new URLSearchParams();
+          if (withFilters) {
+            // include current filters but override status
+            params.forEach((value, key) => {
+              if (key !== "page" && key !== "pageSize" && key !== "status") {
+                p.set(key, value);
+              }
+            });
+          }
+          p.set("status", status);
+          return `/api/voucherEntry/${branchIdFromStorage}?${p.toString()}`;
+        };
+
+        const filteredPendingUrl = buildTotalsUrl("pending", true);
+        const filteredActiveUrl = buildTotalsUrl("active", true);
+        const filteredCancelUrl = buildTotalsUrl("cancel", true);
+        const overallPendingUrl = buildTotalsUrl("pending", false);
+        const overallActiveUrl = buildTotalsUrl("active", false);
+
+        // Fetch table data and four totals in parallel
+        const [
+          resFiltered,
+          resFiltPending,
+          resFiltActive,
+          resFiltCancel,
+          resOverPending,
+          resOverActive,
+        ] = await Promise.all([
+          fetch(filteredUrl),
+          fetch(filteredPendingUrl),
+          fetch(filteredActiveUrl),
+          fetch(filteredCancelUrl),
+          fetch(overallPendingUrl),
+          fetch(overallActiveUrl),
+        ]);
+        if (!resFiltered.ok) throw new Error("Failed to fetch vouchers");
+        if (!resFiltPending.ok || !resFiltActive.ok || !resFiltCancel.ok)
+          throw new Error("Failed to fetch filtered totals");
+        if (!resOverPending.ok || !resOverActive.ok)
+          throw new Error("Failed to fetch overall totals");
+
+        const [
+          response,
+          respFiltPending,
+          respFiltActive,
+          respFiltCancel,
+          respOverPending,
+          respOverActive,
+        ] = await Promise.all([
+          resFiltered.json(),
+          resFiltPending.json(),
+          resFiltActive.json(),
+          resFiltCancel.json(),
+          resOverPending.json(),
+          resOverActive.json(),
+        ]);
+
+        const vouchers: Voucher[] = Array.isArray(response)
           ? response
           : response.vouchers || [];
-
-        const mapped: Voucher[] = vouchers.map(
-          (v: Record<string, unknown>) => ({
-            _id: String(v._id),
-            voucherNo: String(v.voucherNo ?? ""),
-            voucherBook: String(v.voucherBook ?? ""),
-            invoiceNo: v.invoiceNo ? String(v.invoiceNo) : undefined,
-            createdAt: v.createdAt
-              ? String(v.createdAt).slice(0, 10)
-              : undefined,
-            voucherGivenDate: v.voucherGivenDate
-              ? String(v.voucherGivenDate).slice(0, 10)
-              : "",
-            supplier: String(v.supplier ?? ""),
-            amount: Number(v.amount ?? 0),
-            dues: Number(v.dues ?? 0),
-            return: Number(v.return ?? 0),
-            discountAdvance: Number(v.discountAdvance ?? 0),
-            netBalance: Number(v.netBalance ?? 0),
-            modeOfPayment: String(v.modeOfPayment ?? ""),
-            chqCashIssuedDate: v.chqCashIssuedDate
-              ? String(v.chqCashIssuedDate).slice(0, 10)
-              : "",
-            amountPaid: Number(v.amountPaid ?? 0),
-            voucherClearedDate: v.voucherClearedDate
-              ? String(v.voucherClearedDate).slice(0, 10)
-              : "",
-            remarks: String(v.remarks ?? ""),
-            status: (String(v.status ?? "") === "cancel"
-              ? "cancel"
-              : v.voucherClearedDate
-              ? "active"
-              : "pending") as "pending" | "active" | "cancel",
-          })
-        );
-        setData(mapped);
-
+        setData(vouchers);
         if (!Array.isArray(response)) {
+          // Table count (can include cancelled if not filtered out by user)
           setTotalCount(Number(response.totalCount || 0));
         } else {
-          const count = mapped.length;
-          setTotalCount(count);
+          setTotalCount(vouchers.length);
         }
+
+        // Filtered totals based on Payment Status selection
+        const filtCountPending = Number(respFiltPending?.totalCount || 0);
+        const filtCountActive = Number(respFiltActive?.totalCount || 0);
+        const filtCountCancel = Number(respFiltCancel?.totalCount || 0);
+        const filtNetPending = Number(
+          respFiltPending?.grandTotalNetBalance || 0
+        );
+        const filtNetActive = Number(respFiltActive?.grandTotalNetBalance || 0);
+        const filtNetCancel = Number(respFiltCancel?.grandTotalNetBalance || 0);
+
+        const statusFilterValue = (
+          table.getColumn("status")?.getFilterValue() as string | undefined
+        )?.trim();
+
+        if (statusFilterValue === "pending") {
+          setFilteredTotalCountExcludingCancelled(filtCountPending);
+          setFilteredGrandTotalNetBalance(filtNetPending);
+        } else if (statusFilterValue === "active") {
+          setFilteredTotalCountExcludingCancelled(filtCountActive);
+          setFilteredGrandTotalNetBalance(filtNetActive);
+        } else if (statusFilterValue === "cancel") {
+          setFilteredTotalCountExcludingCancelled(filtCountCancel);
+          setFilteredGrandTotalNetBalance(filtNetCancel);
+        } else {
+          // Default: exclude cancelled (Pending + Active)
+          setFilteredTotalCountExcludingCancelled(
+            filtCountPending + filtCountActive
+          );
+          setFilteredGrandTotalNetBalance(filtNetPending + filtNetActive);
+        }
+
+        // Overall totals excluding cancelled = pending + active
+        const overCountPending = Number(respOverPending?.totalCount || 0);
+        const overCountActive = Number(respOverActive?.totalCount || 0);
+        const overNetPending = Number(
+          respOverPending?.grandTotalNetBalance || 0
+        );
+        const overNetActive = Number(respOverActive?.grandTotalNetBalance || 0);
+        setOverallTotalCount(overCountPending + overCountActive);
+        setOverallGrandTotalNetBalance(overNetPending + overNetActive);
       } catch (err) {
         console.error(err);
-        setData([]);
       } finally {
         setLoading(false);
       }
@@ -297,7 +382,6 @@ function PageImpl({ params }: { params: Promise<{ id: string }> }) {
     fetchVouchers();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
-    branchId,
     pageIndex,
     pageSize,
     sorting,
@@ -305,6 +389,7 @@ function PageImpl({ params }: { params: Promise<{ id: string }> }) {
     issueDateRange,
     givenDateRange,
     clearedDateRange,
+    reloadKey,
   ]);
 
   const columns: ColumnDef<Voucher>[] = [
@@ -313,15 +398,87 @@ function PageImpl({ params }: { params: Promise<{ id: string }> }) {
       header: () => <div className="text-sm">Paid</div>,
       cell: ({ row }) => {
         const isPaid = Boolean(row.original.voucherClearedDate);
+        const isCancelled = row.original.status === "cancel";
+        const handleStatusChange = async (checked: boolean) => {
+          const now = new Date();
+          const local = new Date(
+            now.getTime() - now.getTimezoneOffset() * 60000
+          );
+          const today = local.toISOString().slice(0, 10);
+          const newStatus: Voucher["status"] = checked ? "active" : "pending";
 
-        return (
+          // Calculate net balance considering discount/advance
+          const voucher = row.original;
+          const netBalance = checked
+            ? voucher.amount -
+              voucher.dues -
+              voucher.return -
+              voucher.discountAdvance
+            : voucher.amount; // Reset to original amount when unpaid
+
+          // Optimistic update
+          const previous = data;
+          const optimistic: Voucher[] = data.map((v) =>
+            v._id === row.original._id
+              ? {
+                  ...v,
+                  chqCashIssuedDate: checked ? today : "",
+                  voucherClearedDate: checked ? today : "",
+                  amountPaid: checked ? netBalance : 0, // Use calculated net balance
+                  netBalance: netBalance, // Update net balance
+                  status: newStatus,
+                }
+              : v
+          );
+          setData(optimistic);
+
+          try {
+            const res = await fetch("/api/voucherEntry/paid", {
+              method: "PATCH",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                voucherEntryId: row.original._id,
+                voucherClearedDate: checked ? today : "",
+                chqCashIssuedDate: checked ? today : "",
+                amountPaid: checked ? netBalance : 0, // Use calculated net balance
+                netBalance: netBalance, // Send net balance to API
+                status: newStatus,
+              }),
+            });
+
+            if (!res.ok) {
+              const err = await res.json().catch(() => ({}));
+              setData(previous);
+              toast.error(err?.error || "Failed to update voucher status");
+            } else {
+              const payload = await res.json().catch(() => null);
+              if (payload?.voucher) {
+                setData((prev) => {
+                  const updated = prev.map((v) =>
+                    v._id === row.original._id
+                      ? (payload.voucher as Voucher)
+                      : v
+                  );
+
+                  return updated;
+                });
+              }
+            }
+          } catch {
+            setData(previous);
+            toast.error("Error updating voucher status");
+          }
+        };
+
+        const checkbox = (
           <div className="flex items-center justify-center">
             <div
-              className={`w-4 h-4 border-2 rounded flex items-center justify-center ${
+              className={`w-4 h-4 border-2 rounded flex items-center justify-center transition-colors ${
                 isPaid
                   ? "bg-blue-600 border-blue-600 text-white"
                   : "border-gray-300"
-              }`}
+              } ${isCancelled ? "opacity-50" : ""}`}
+              aria-disabled={isCancelled}
             >
               {isPaid && (
                 <svg
@@ -339,6 +496,9 @@ function PageImpl({ params }: { params: Promise<{ id: string }> }) {
             </div>
           </div>
         );
+
+        // View-only: always return non-interactive checkbox
+        return checkbox;
       },
       enableSorting: false,
       enableHiding: false,
@@ -616,56 +776,47 @@ function PageImpl({ params }: { params: Promise<{ id: string }> }) {
       cell: ({ row }) => {
         const voucher = row.original;
 
-        const handleDelete = async () => {
-          try {
-            const res = await fetch(`/api/voucherEntry/${voucher._id}`, {
-              method: "DELETE",
-            });
-
-            if (!res.ok) {
-              const error = await res.json().catch(() => ({}));
-              toast.error(error?.error || "Failed to delete voucher");
-              return;
-            }
-
-            // Remove from local state
-            setData((prev) => prev.filter((v) => v._id !== voucher._id));
-            toast.success("Voucher deleted successfully");
-          } catch (error) {
-            console.error("Error deleting voucher:", error);
-            toast.error("Error deleting voucher");
-          }
-        };
-
         return (
           <div className="flex space-x-2">
             <Button
               variant="ghost"
               size="sm"
               className="h-8 w-8 p-0"
-              onClick={() => {
-                localStorage.setItem(
-                  "branchDetails",
-                  JSON.stringify({ _id: branchId })
-                );
-                router.push(`/branch/editVoucherEntry/${voucher._id}`);
-              }}
+              onClick={() =>
+                router.push(`/branch/editVoucherEntry/${voucher._id}`)
+              }
             >
               <Edit className="h-4 w-4" />
               <span className="sr-only">Edit voucher</span>
             </Button>
             <ConfirmDialog
               triggerLabel={
-                <div className="inline-flex items-center justify-center whitespace-nowrap text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 hover:bg-accent h-8 w-8 p-0 text-red-600 hover:text-red-700 rounded-md">
-                  <Trash2 className="h-4 w-4" />
+                <span className="inline-flex h-8 w-8 items-center justify-center text-red-600 hover:text-red-700">
+                  <Trash className="h-4 w-4" />
                   <span className="sr-only">Delete voucher</span>
-                </div>
+                </span>
               }
               title="Delete Voucher"
               description={`Are you sure you want to delete voucher #${voucher.voucherNo}? This action cannot be undone.`}
               confirmLabel="Delete"
               cancelLabel="Cancel"
-              onConfirm={handleDelete}
+              onConfirm={async () => {
+                try {
+                  const res = await fetch(`/api/voucherEntry/${voucher._id}`, {
+                    method: "DELETE",
+                  });
+                  if (!res.ok) {
+                    const err = await res.json().catch(() => ({}));
+                    toast.error(err?.error || "Failed to delete voucher");
+                    return;
+                  }
+                  // Refetch entire UI after delete
+                  setReloadKey((k) => k + 1);
+                  toast.success("Voucher deleted successfully");
+                } catch {
+                  toast.error("Error deleting voucher");
+                }
+              }}
             />
           </div>
         );
@@ -710,14 +861,7 @@ function PageImpl({ params }: { params: Promise<{ id: string }> }) {
     },
   });
 
-  // Calculate totals for filtered data (for display purposes)
-  const filteredData = table
-    .getFilteredRowModel()
-    .rows.map((row) => row.original);
-  const filteredGrandTotalAmount = filteredData.reduce(
-    (sum, voucher) => sum + (voucher.netBalance || 0),
-    0
-  );
+  // Note: Cards display overall totals; we also show filtered totals below them
 
   const formatDate = (d?: string) => {
     if (!d) return "";
@@ -831,23 +975,76 @@ function PageImpl({ params }: { params: Promise<{ id: string }> }) {
     return wb;
   };
 
-  const handleExportExcel = () => {
-    const filteredRows = table
-      .getFilteredRowModel()
-      .rows.map((r) => r.original);
-    const useFiltered =
-      filteredRows.length > 0 && filteredRows.length < data.length;
-    const rows = useFiltered ? filteredRows : data;
+  const handleExportExcel = async () => {
+    try {
+      const raw = localStorage.getItem("branchDetails");
+      if (!raw) {
+        toast.error("Branch not selected");
+        return;
+      }
+      const parsed = JSON.parse(raw);
+      const branchIdFromStorage =
+        typeof parsed?._id === "string" ? parsed._id : null;
+      if (!branchIdFromStorage) {
+        toast.error("Invalid branch");
+        return;
+      }
 
-    const wb = createExcelFile(rows);
+      const params = new URLSearchParams();
+      params.set("page", "1");
+      params.set("pageSize", "1000000");
 
-    const suffix = useFiltered ? "filtered" : "all";
-    const today = new Date().toISOString().slice(0, 10);
-    const safeBranch = (branchName || "branch").replace(/[^a-z0-9-_]+/gi, "-");
-    const filename = `vouchers_${safeBranch}_${today}_${suffix}.xlsx`;
+      if (sorting?.[0]) {
+        params.set("sortBy", sorting[0].id);
+        params.set("sortDir", sorting[0].desc ? "desc" : "asc");
+      }
 
-    XLSX.writeFile(wb, filename);
-    toast.success(`Excel file exported successfully: ${filename}`);
+      const addDateParams = (
+        keyPrefix: string,
+        range: { from?: string; to?: string }
+      ) => {
+        if (range.from) params.set(`${keyPrefix}From`, range.from);
+        if (range.to) params.set(`${keyPrefix}To`, range.to);
+      };
+      addDateParams("created", issueDateRange);
+      addDateParams("given", givenDateRange);
+      addDateParams("cleared", clearedDateRange);
+
+      const voucherNoFilter = (
+        table.getColumn("voucherNo")?.getFilterValue() as string
+      )?.trim();
+      if (voucherNoFilter) params.set("voucherNo", voucherNoFilter);
+
+      const supplierFilter = (
+        table.getColumn("supplier")?.getFilterValue() as string
+      )?.trim();
+      if (supplierFilter) params.set("supplier", supplierFilter);
+
+      // Always export all statuses; intentionally ignore current status filter
+
+      const url = `/api/voucherEntry/${branchIdFromStorage}?${params.toString()}`;
+      const res = await fetch(url);
+      if (!res.ok) throw new Error("Failed to fetch all vouchers for export");
+      const payload = await res.json();
+      const rows: Voucher[] = Array.isArray(payload)
+        ? payload
+        : payload.vouchers || [];
+
+      const wb = createExcelFile(rows);
+
+      const today = new Date().toISOString().slice(0, 10);
+      const safeBranch = (branchName || "branch").replace(
+        /[^a-z0-9-_]+/gi,
+        "-"
+      );
+      const filename = `vouchers_${safeBranch}_${today}_all.xlsx`;
+
+      XLSX.writeFile(wb, filename);
+      toast.success(`Excel file exported successfully: ${filename}`);
+    } catch (e) {
+      console.error(e);
+      toast.error("Failed to export Excel");
+    }
   };
 
   return (
@@ -882,7 +1079,10 @@ function PageImpl({ params }: { params: Promise<{ id: string }> }) {
                     Total Vouchers
                   </p>
                   <p className="text-3xl font-bold text-gray-900">
-                    {totalCount}
+                    {overallTotalCount}
+                  </p>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Filtered : {filteredTotalCountExcludingCancelled}
                   </p>
                 </div>
                 <div className="p-3 bg-gradient-to-r from-blue-500 to-blue-600 rounded-xl group-hover:scale-110 transition-transform duration-300">
@@ -898,7 +1098,11 @@ function PageImpl({ params }: { params: Promise<{ id: string }> }) {
                     Total Amount
                   </p>
                   <p className="text-2xl font-bold text-green-600">
-                    ₹{filteredGrandTotalAmount.toLocaleString("en-IN")}
+                    ₹{overallGrandTotalNetBalance.toLocaleString("en-IN")}
+                  </p>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Filtered : ₹
+                    {filteredGrandTotalNetBalance.toLocaleString("en-IN")}
                   </p>
                 </div>
                 <div className="p-3 bg-gradient-to-r from-green-500 to-emerald-600 rounded-xl group-hover:scale-110 transition-transform duration-300">
@@ -990,6 +1194,7 @@ function PageImpl({ params }: { params: Promise<{ id: string }> }) {
                     <option value="">All Status</option>
                     <option value="active">Paid</option>
                     <option value="pending">Pending</option>
+                    <option value="cancel">Cancelled</option>
                   </select>
                 </div>
               </div>
@@ -1151,7 +1356,7 @@ function PageImpl({ params }: { params: Promise<{ id: string }> }) {
                   )}
                 </button>
 
-                {/* <div className="relative">
+                <div className="relative">
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <button className="flex items-center gap-2 px-4 py-2 bg-white border-2 border-gray-200 rounded-lg hover:bg-gray-50 focus:ring-4 focus:ring-blue-100 transition-all duration-200">
@@ -1180,7 +1385,7 @@ function PageImpl({ params }: { params: Promise<{ id: string }> }) {
                         })}
                     </DropdownMenuContent>
                   </DropdownMenu>
-                </div> */}
+                </div>
               </div>
             </div>
           </div>
@@ -1312,7 +1517,13 @@ function PageImpl({ params }: { params: Promise<{ id: string }> }) {
                   <select
                     value={table.getState().pagination.pageSize}
                     onChange={(e) => {
-                      table.setPageSize(Number(e.target.value));
+                      const value = e.target.value;
+                      if (value === "all") {
+                        setPageIndex(0);
+                        setPageSize(1000000);
+                      } else {
+                        table.setPageSize(Number(value));
+                      }
                     }}
                     className="px-3 py-1 border-2 border-gray-200 rounded-lg focus:ring-4 focus:ring-blue-100 focus:border-blue-500 transition-all duration-200"
                   >
@@ -1321,6 +1532,7 @@ function PageImpl({ params }: { params: Promise<{ id: string }> }) {
                         {pageSize}
                       </option>
                     ))}
+                    <option value="all">Show All</option>
                   </select>
                 </div>
               </div>
@@ -1460,11 +1672,4 @@ function PageImpl({ params }: { params: Promise<{ id: string }> }) {
       </div>
     </>
   );
-}
-
-export default function Page(props: { params: Promise<{ id: string }> }) {
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => setMounted(true), []);
-  if (!mounted) return null;
-  return <PageImpl {...props} />;
 }
